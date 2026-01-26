@@ -88,29 +88,24 @@ func (s *GcpDataService) FetchProjects(serviceAccountID string) ([]GcpProjectInf
 	}
 
 	// Use SearchProjects (v3) instead of List (v1)
-	// Query syntax: "state:ACTIVE"
-	response, err := service.Projects.Search().Query("state:ACTIVE").Do()
-	if err != nil {
-		return nil, err
-	}
+	req := service.Projects.Search().Query("state:ACTIVE")
 
 	var projects []GcpProjectInfo
-	for _, project := range response.Projects {
-		if project.ProjectId == "" {
-			continue
+
+	if err := req.Pages(context.Background(), func(page *cloudresourcemanager.SearchProjectsResponse) error {
+		for _, project := range page.Projects {
+			if project.ProjectId == "" {
+				continue
+			}
+			projects = append(projects, GcpProjectInfo{
+				ProjectID: project.ProjectId,
+				Name:      project.DisplayName,           // Changed from Name to DisplayName for v3
+				Number:    extractLastPart(project.Name), // Extract number from "projects/12345"
+			})
 		}
-
-		// v3 uses project.Name format as "projects/12345" sometimes or just number?
-		// Actually v3 `Name` is "projects/{projectId}" or "projects/{projectNumber}"
-		// But `ProjectId` field exists.
-		// `project.Name` in v3 is usually the resource name.
-		// `project.DisplayName` is the human-readable name.
-
-		projects = append(projects, GcpProjectInfo{
-			ProjectID: project.ProjectId,
-			Name:      project.DisplayName,           // Changed from Name to DisplayName for v3
-			Number:    extractLastPart(project.Name), // Extract number from "projects/12345"
-		})
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return projects, nil

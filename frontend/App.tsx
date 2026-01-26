@@ -141,7 +141,7 @@ function App() {
         ) : (
           <div className="relative h-full">
             {/* 匯出按鈕可以放在這裡或 Layout 內 */}
-            <div className="absolute top-4 right-4 z-10">
+            <div className="absolute bottom-8 right-8 z-50">
               <button
                 onClick={handleExportClick}
                 className="px-4 py-2 bg-emerald-500 text-white font-medium rounded-lg hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/50 flex items-center"
