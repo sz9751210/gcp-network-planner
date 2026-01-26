@@ -1,0 +1,80 @@
+services:
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3001:3001"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - PORT=3001
+  #     - DATABASE_URL=file:./dev.db
+  #     - ENCRYPTION_KEY=936f2425316f73a12b9870492aef6733b9504147ef113a902065a59de4b0e946
+  #     - CORS_ORIGINS=${FRONTEND_URL:-http://localhost:3000}
+  #   volumes:
+  #     - backend_data:/app/prisma
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
+  #   profiles:
+  #     - node
+
+  go-backend:
+    build:
+      context: ./go-backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=file:./dev.db
+      - ENCRYPTION_KEY=936f2425316f73a12b9870492aef6733b9504147ef113a902065a59de4b0e946
+      - CORS_ORIGINS=${FRONTEND_URL:-http://localhost:3000},http://localhost:3031
+    volumes:
+      - go_backend_data:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    profiles:
+      - go
+
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:80"
+  #   environment:
+  #     - VITE_API_URL=${API_URL:-http://backend:3001}
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
+  #   profiles:
+  #     - node
+
+  frontend-go:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3031:80"
+    environment:
+      - VITE_API_URL=${API_URL:-http://go-backend:3001}
+    depends_on:
+      - go-backend
+    restart: unless-stopped
+    profiles:
+      - go
+
+volumes:
+  # backend_data:
+  go_backend_data:

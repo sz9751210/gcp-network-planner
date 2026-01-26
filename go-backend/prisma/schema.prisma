@@ -1,0 +1,161 @@
+// This is a GORM-compatible schema that mirrors the Prisma schema
+// For the Go backend, GORM is used instead of Prisma
+
+generator client {
+  provider = "go.uber.org/zap"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ServiceAccount {
+  id           String       @id @default(cuid())
+  name         String       @default("")
+  project_id   String       @default("")
+  account_email String      @default("")
+  encrypted_key String      @default("")
+  is_active    Boolean      @default(true)
+  created_at   DateTime     @default(now())
+  updated_at   DateTime     @default(now())
+  gcp_projects []GcpProject
+
+  @@index([project_id])
+  @@map("service_accounts")
+}
+
+model GcpProject {
+  id                String         @id @default(cuid())
+  project_id        String         @unique @default("")
+  name              String         @default("")
+  number            String         @default("")
+  is_active         Boolean        @default(true)
+  last_scanned_at   *time.Time
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @default(now())
+  service_account_id *String       @unique
+  service_account   *ServiceAccount @relation(fields: [service_account_id], references: [id])
+  vpcs              []GcpVpc
+
+  @@index([project_id])
+  @@map("gcp_projects")
+}
+
+model GcpVpc {
+  id              String        @id @default(cuid())
+  name            String        @default("")
+  vpc_id          String        @default("")
+  project_id      String        @default("")
+  gcp_project_id  String        @default("")
+  is_shared_vpc_host Boolean     @default(false)
+  mtu             *int
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @default(now())
+  project         GcpProject    @relation(fields: [gcp_project_id], references: [id], onDelete: Cascade)
+  subnets         []GcpSubnet
+  peerings        []GcpVpcPeering
+  routes          []GcpRoute
+
+  @@unique([gcp_project_id, vpc_id])
+  @@index([gcp_project_id])
+  @@map("gcp_vpcs")
+}
+
+model GcpSubnet {
+  id                    String   @id @default(cuid())
+  name                  String   @default("")
+  region                String   @default("")
+  ip_cidr_range         String   @default("")
+  gateway_ip            String   @default("")
+  private_google_access Boolean  @default(false)
+  self_link             String   @default("")
+  vpc_id                String   @default("")
+  gcp_vpc_id            String   @default("")
+  created_at            DateTime @default(now())
+  updated_at            DateTime @default(now())
+  vpc                   GcpVpc   @relation(fields: [gcp_vpc_id], references: [id], onDelete: Cascade)
+
+  @@unique([gcp_vpc_id, name])
+  @@index([gcp_vpc_id])
+  @@index([region])
+  @@map("gcp_subnets")
+}
+
+model GcpVpcPeering {
+  id                   String   @id @default(cuid())
+  name                 String   @default("")
+  target_network       String   @default("")
+  state                String   @default("")
+  export_custom_routes Boolean  @default(false)
+  import_custom_routes Boolean  @default(false)
+  vpc_id               String   @default("")
+  gcp_vpc_id           String   @default("")
+  created_at           DateTime @default(now())
+  updated_at           DateTime @default(now())
+  vpc                  GcpVpc   @relation(fields: [gcp_vpc_id], references: [id], onDelete: Cascade)
+
+  @@unique([gcp_vpc_id, name])
+  @@index([gcp_vpc_id])
+  @@map("gcp_vpc_peerings")
+}
+
+model GcpRoute {
+  id           String   @id @default(cuid())
+  name         String   @default("")
+  vpc_id       String   @default("")
+  gcp_vpc_id   String   @default("")
+  dest_range   String   @default("")
+  next_hop     String   @default("")
+  priority     Int
+  description  String   @default("")
+  tags         String   @default("")
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+  vpc          GcpVpc   @relation(fields: [gcp_vpc_id], references: [id], onDelete: Cascade)
+
+  @@unique([gcp_vpc_id, name])
+  @@index([gcp_vpc_id])
+  @@map("gcp_routes")
+}
+
+model GcpInstance {
+  id           String   @id @default(cuid())
+  name         String   @unique @default("")
+  instance_id  String   @default("")
+  zone         String   @default("")
+  machine_type String   @default("")
+  status       String   @default("")
+  internal_ip  String   @default("")
+  external_ip  *String
+  network      String   @default("")
+  subnetwork   String   @default("")
+  tags         String   @default("")
+  labels       String   @default("")
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  @@index([status])
+  @@map("gcp_instances")
+}
+
+model GcpFirewallRule {
+  id           String   @id @default(cuid())
+  name         String   @unique @default("")
+  network      String   @default("")
+  direction    String   @default("")
+  priority     Int
+  action       String   @default("")
+  description  String   @default("")
+  source_ranges String  @default("")
+  source_tags  String   @default("")
+  target_tags  String   @default("")
+  allowed      String   @default("")
+  denied       String   @default("")
+  disabled     Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  @@index([network])
+  @@map("gcp_firewall_rules")
+}

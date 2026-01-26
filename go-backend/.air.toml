@@ -1,0 +1,56 @@
+[root]
+test = false
+# Binary file name
+bin = "bin/server"
+# Folder to watch
+tmp_dir = "tmp"
+
+[build]
+# Just plain old shell command
+cmd = "go build -o bin/server ./cmd/main.go"
+# Binary file name
+bin = "bin/server"
+# Customize executable
+full_bin = ""
+# Listen to port
+listen_addr = ":3002"
+# Log file
+log = "tmp/air.log"
+# Error file
+error_file = "tmp/air.err"
+# The directory to execute the command
+include_dir = ["cmd", "internal"]
+# Exclude files
+exclude_dir = ["tmp", "vendor", "bin"]
+# Exclude specific files
+exclude_file = []
+# Exclude unchanged files
+exclude_unchanged = false
+# Follow symbolic link
+follow_symlink = false
+# No build use -o
+no_build_pre = false
+# Ignore directories
+ignore = []
+# Interrupt the process on the first error
+kill_delay = "0s"
+# Stop running old process after the first error
+kill_on_error = false
+# Send Interrupt signal before killing process
+kill_signal = "SIGINT"
+# Delay after sending Kill signal
+kill_delay = "1s"
+# This value will be added at the end of the command
+post_cmd = ""
+# This value will be added at the beginning of the command
+pre_cmd = ""
+# Delay after which the process is killed
+run_delay = "0s"
+# Remove bin folder on exit
+remove_bin = false
+# Show console log
+show_log = false
+# Use color
+use_color = true
+# Watch these extensions
+watch_exts = ["go"]

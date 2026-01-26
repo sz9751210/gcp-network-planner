@@ -1,0 +1,37 @@
+{
+  "name": "gcp-network-planner-backend",
+  "version": "1.0.0",
+  "description": "Backend API for GCP Network Planner with database storage for service account credentials",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "ts-node prisma/seed.ts"
+  },
+  "keywords": ["gcp", "google-cloud", "network", "prisma", "express"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@google-cloud/compute": "^4.7.0",
+    "@google-cloud/resource-manager": "^5.0.0",
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.14.0",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.2"
+  }
+}

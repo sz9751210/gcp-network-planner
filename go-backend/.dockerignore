@@ -1,0 +1,55 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Build artifacts
+dist/
+build/
+
+# Go workspace file
+go.work
+
+# Test coverage
+*.coverprofile
+coverage.html
+coverage.out
+
+# Database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+dev.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Development tools
+.air.toml
+Makefile
