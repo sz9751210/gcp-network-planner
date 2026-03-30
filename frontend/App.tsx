@@ -19,7 +19,7 @@ import { GkeStorage } from './components/GkeStorage';
 import { GkeConfiguration } from './components/GkeConfiguration';
 import { CommandPalette } from './components/CommandPalette';
 import { ServiceAccounts } from './components/ServiceAccounts';
-import { fetchAllGcpData } from './services/api';
+import { fetchInventory, fetchScan, startScan, type ScanRecord } from './services/api';
 import { GcpProject } from './types';
 
 function App() {
@@ -27,6 +27,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState('');
   const [selectedServiceAccountId, setSelectedServiceAccountId] = useState<string>('');
+  const [scanId, setScanId] = useState<string>('');
+  const [scanStatus, setScanStatus] = useState<'idle' | 'queued' | 'running' | 'partial' | 'success' | 'failed'>('idle');
+  const [scanErrors, setScanErrors] = useState<{ projectId: string; error: string }[]>([]);
+  const [lastScannedAt, setLastScannedAt] = useState<string>('');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Navigation State
@@ -34,29 +38,70 @@ function App() {
   // Global Project Filter State
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const storedAccountId = localStorage.getItem('selectedServiceAccountId');
-      if (storedAccountId) {
-        setSelectedServiceAccountId(storedAccountId);
-        setLoading(true);
-        try {
-          setLoadingProgress('Fetching GCP projects...');
-          const data = await fetchAllGcpData(storedAccountId);
-          setProjects(data);
-          setLoadingProgress('');
-        } catch (error) {
-          console.error('Failed to fetch GCP data:', error);
-          setLoadingProgress('Failed to fetch data');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          setLoadingProgress('');
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
+  const pollScanUntilFinished = async (id: string): Promise<ScanRecord> => {
+    const maxPolls = 240;
+    for (let poll = 0; poll < maxPolls; poll++) {
+      const result = await fetchScan(id);
+      setScanStatus(result.status);
+      setScanErrors(result.errors);
 
-    fetchData();
+      if (result.status === 'queued' || result.status === 'running') {
+        const total = result.totalProjects > 0 ? result.totalProjects : '?';
+        setLoadingProgress(`Scanning projects (${result.completedProjects}/${total})...`);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        continue;
+      }
+
+      return result;
+    }
+
+    throw new Error('Scan timed out after 8 minutes.');
+  };
+
+  const runScanAndLoadData = async (accountId: string) => {
+    setLoading(true);
+    setLoadingProgress('Queueing project scan...');
+    setScanErrors([]);
+    setProjects([]);
+
+    try {
+      const scan = await startScan(accountId, 'project');
+      setScanId(scan.scanId);
+      setScanStatus(scan.status);
+
+      const finalScan = await pollScanUntilFinished(scan.scanId);
+
+      if (finalScan.status === 'failed') {
+        const fallback = await fetchInventory(accountId);
+        setProjects(fallback);
+        setLastScannedAt(new Date().toISOString());
+        setLoadingProgress('Scan failed. Showing latest available inventory.');
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      } else {
+        const finalProjects = finalScan.projects.length > 0 ? finalScan.projects : await fetchInventory(accountId);
+        setProjects(finalProjects);
+        setScanErrors(finalScan.errors);
+        setLastScannedAt(finalScan.completedAt || new Date().toISOString());
+        setLoadingProgress('');
+      }
+    } catch (error) {
+      console.error('Failed to scan GCP data:', error);
+      setLoadingProgress('Failed to fetch data');
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      setLoadingProgress('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const storedAccountId = localStorage.getItem('selectedServiceAccountId');
+    if (!storedAccountId) {
+      return;
+    }
+    setSelectedServiceAccountId(storedAccountId);
+    runScanAndLoadData(storedAccountId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCommandNavigate = (view: ViewType, projectId?: string) => {
@@ -68,8 +113,9 @@ function App() {
 
   const handleServiceAccountChange = (accountId: string) => {
     setSelectedServiceAccountId(accountId);
+    setSelectedProjectId('all');
     localStorage.setItem('selectedServiceAccountId', accountId);
-    window.location.reload();
+    runScanAndLoadData(accountId);
   };
 
   const handleExportClick = () => {
@@ -80,7 +126,16 @@ function App() {
   const renderContent = () => {
     switch (currentView) {
       case 'service_accounts': return <ServiceAccounts onSelectAccount={handleServiceAccountChange} />;
-      case 'dashboard': return <Dashboard projects={projects} selectedProjectId={selectedProjectId} />;
+      case 'dashboard': return (
+        <Dashboard
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          scanStatus={scanStatus}
+          scanId={scanId}
+          scanErrors={scanErrors}
+          lastScannedAt={lastScannedAt}
+        />
+      );
       case 'topology': return <HierarchyTree projects={projects} selectedProjectId={selectedProjectId} />;
       case 'peering': return <NetworkPeeringMap projects={projects} />;
       case 'allocations': return <CidrAllocations projects={projects} selectedProjectId={selectedProjectId} />;
@@ -122,7 +177,7 @@ function App() {
               </div>
             </div>
             <span className="font-medium text-lg text-slate-300">
-              {loadingProgress || 'Loading GCP Data...'}
+              {loadingProgress || 'Loading GCP Inventory...'}
             </span>
           </div>
         ) : projects.length === 0 && !selectedServiceAccountId && currentView !== 'service_accounts' ? (

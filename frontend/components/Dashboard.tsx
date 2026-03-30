@@ -4,9 +4,20 @@ import { GcpProject } from '../types';
 interface Props {
   projects: GcpProject[];
   selectedProjectId: string;
+  scanStatus: 'idle' | 'queued' | 'running' | 'partial' | 'success' | 'failed';
+  scanId: string;
+  scanErrors: { projectId: string; error: string }[];
+  lastScannedAt: string;
 }
 
-export const Dashboard: React.FC<Props> = ({ projects, selectedProjectId }) => {
+export const Dashboard: React.FC<Props> = ({
+  projects,
+  selectedProjectId,
+  scanStatus,
+  scanId,
+  scanErrors,
+  lastScannedAt,
+}) => {
   // Filter data based on selection
   const activeProjects = useMemo(() => 
     projects.filter(p => selectedProjectId === 'all' || p.projectId === selectedProjectId),
@@ -47,6 +58,14 @@ export const Dashboard: React.FC<Props> = ({ projects, selectedProjectId }) => {
     return { totalVpcs, totalSubnets, totalInstances, runningInstances, sharedVpcs, topRegions, utilScore };
   }, [activeProjects]);
 
+  const scanStatusColor = useMemo(() => {
+    if (scanStatus === 'success') return 'text-emerald-400 border-emerald-700 bg-emerald-900/20';
+    if (scanStatus === 'partial') return 'text-amber-400 border-amber-700 bg-amber-900/20';
+    if (scanStatus === 'failed') return 'text-red-400 border-red-700 bg-red-900/20';
+    if (scanStatus === 'running' || scanStatus === 'queued') return 'text-blue-400 border-blue-700 bg-blue-900/20';
+    return 'text-slate-400 border-slate-700 bg-slate-800/40';
+  }, [scanStatus]);
+
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
@@ -58,8 +77,36 @@ export const Dashboard: React.FC<Props> = ({ projects, selectedProjectId }) => {
           </p>
         </div>
         <div className="text-right hidden sm:block">
-           <span className="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-1 rounded border border-slate-700">Last scanned: Just now</span>
+           <span className="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-1 rounded border border-slate-700">
+             Last scanned: {lastScannedAt ? new Date(lastScannedAt).toLocaleString() : 'N/A'}
+           </span>
         </div>
+      </div>
+
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className={`text-xs px-2 py-1 rounded border font-semibold uppercase ${scanStatusColor}`}>
+              Scan: {scanStatus}
+            </span>
+            {scanId && <span className="text-xs font-mono text-slate-500">Job: {scanId}</span>}
+          </div>
+          <span className="text-xs text-slate-400">
+            Error Count: <span className="text-slate-200 font-semibold">{scanErrors.length}</span>
+          </span>
+        </div>
+        {scanErrors.length > 0 && (
+          <div className="mt-3 space-y-1">
+            {scanErrors.slice(0, 3).map((scanError) => (
+              <div key={`${scanError.projectId}-${scanError.error}`} className="text-xs text-red-300 bg-red-900/20 border border-red-900/40 rounded px-2 py-1">
+                [{scanError.projectId || 'global'}] {scanError.error}
+              </div>
+            ))}
+            {scanErrors.length > 3 && (
+              <div className="text-xs text-slate-500">...and {scanErrors.length - 3} more errors.</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* KPI Cards */}

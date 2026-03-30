@@ -8,6 +8,7 @@ import (
 	// "github.com/code-yeongyu/gcp-network-planner/go-backend/internal/repository" // REMOVED: Unused
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v3"
 	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/container/v1"
 	"google.golang.org/api/option"
 )
 
@@ -31,6 +32,7 @@ type GcpSubnetInfo struct {
 	GatewayIp           string `json:"gatewayIp"`
 	PrivateGoogleAccess bool   `json:"privateGoogleAccess"`
 	SelfLink            string `json:"selfLink"`
+	Network             string `json:"network"` // Added for aggregation
 }
 
 type GcpFirewallRuleInfo struct {
@@ -60,6 +62,59 @@ type GcpInstanceInfo struct {
 	Subnetwork  string `json:"subnetwork"`
 	Tags        string `json:"tags"`
 	Labels      string `json:"labels"`
+}
+
+type GcpNodePoolInfo struct {
+	Name        string `json:"name"`
+	NodeCount   int    `json:"nodeCount"`
+	MachineType string `json:"machineType"`
+	Version     string `json:"version"`
+}
+
+type GcpGkeClusterInfo struct {
+	ID                       string            `json:"id"`
+	Name                     string            `json:"name"`
+	Location                 string            `json:"location"`
+	Status                   string            `json:"status"`
+	Endpoint                 string            `json:"endpoint"`
+	MasterVersion            string            `json:"masterVersion"`
+	Network                  string            `json:"network"`
+	Subnetwork               string            `json:"subnetwork"`
+	ClusterIpv4Cidr          string            `json:"clusterIpv4Cidr"`
+	ServicesIpv4Cidr         string            `json:"servicesIpv4Cidr"`
+	MasterIpv4Cidr           string            `json:"masterIpv4Cidr"`
+	PrivateCluster           bool              `json:"privateCluster"`
+	MasterAuthorizedNetworks []string          `json:"masterAuthorizedNetworks"`
+	NodePools                []GcpNodePoolInfo `json:"nodePools"`
+	VerticalPodAutoscaling   bool              `json:"verticalPodAutoscaling"`
+	WorkloadIdentityConfig   bool              `json:"workloadIdentityConfig"`
+}
+
+type GcpLoadBalancerInfo struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	Protocol       string `json:"protocol"`
+	Region         string `json:"region"`
+	IPAddress      string `json:"ipAddress"`
+	PortRange      string `json:"portRange"`
+	BackendService string `json:"backendService"`
+}
+
+type GcpSecurityPolicyRuleInfo struct {
+	Priority    int    `json:"priority"`
+	Action      string `json:"action"`
+	Preview     bool   `json:"preview"`
+	SrcIpRanges string `json:"srcIpRanges"` // JSON string of array
+	Description string `json:"description"`
+}
+
+type GcpCloudArmorPolicyInfo struct {
+	ID          string                      `json:"id"`
+	Name        string                      `json:"name"`
+	Description string                      `json:"description"`
+	Type        string                      `json:"type"`
+	Rules       []GcpSecurityPolicyRuleInfo `json:"rules"`
 }
 
 type GcpDataService struct {
@@ -178,6 +233,7 @@ func (s *GcpDataService) FetchSubnets(serviceAccountID string, projectID string,
 				GatewayIp:           subnet.GatewayAddress,
 				PrivateGoogleAccess: subnet.PrivateIpGoogleAccess,
 				SelfLink:            subnet.SelfLink,
+				Network:             subnet.Network, // Populate Network
 			}
 
 			allSubnets = append(allSubnets, subnetInfo)
@@ -380,4 +436,189 @@ func deniedToJSON(denied []*compute.FirewallDenied) string {
 	}
 	result += "]"
 	return result
+}
+
+func (s *GcpDataService) FetchGkeClusters(serviceAccountID string, projectID string) ([]GcpGkeClusterInfo, error) {
+	credsJSON, err := s.getCredentials(serviceAccountID)
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := container.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	parent := fmt.Sprintf("projects/%s/locations/-", projectID)
+	response, err := service.Projects.Locations.Clusters.List(parent).Do()
+	if err != nil {
+		// Log error but allow empty return if API is not enabled or permission denied,
+		// though ideally we should handle it better. For now, nil is fine.
+		return nil, err
+	}
+
+	var clusters []GcpGkeClusterInfo
+	for _, cluster := range response.Clusters {
+		var nodePools []GcpNodePoolInfo
+		for _, pool := range cluster.NodePools {
+			machineType := ""
+			if pool.Config != nil {
+				machineType = pool.Config.MachineType
+			}
+			nodePools = append(nodePools, GcpNodePoolInfo{
+				Name:        pool.Name,
+				NodeCount:   int(pool.InitialNodeCount), // This is per zone, might need better calc
+				MachineType: machineType,
+				Version:     pool.Version,
+			})
+		}
+
+		masterAuthorizedNetworks := make([]string, 0)
+		if cluster.MasterAuthorizedNetworksConfig != nil {
+			for _, cidr := range cluster.MasterAuthorizedNetworksConfig.CidrBlocks {
+				if cidr == nil {
+					continue
+				}
+				masterAuthorizedNetworks = append(masterAuthorizedNetworks, cidr.CidrBlock)
+			}
+		}
+
+		privateCluster := false
+		masterCIDR := ""
+		if cluster.PrivateClusterConfig != nil {
+			privateCluster = cluster.PrivateClusterConfig.EnablePrivateNodes || cluster.PrivateClusterConfig.EnablePrivateEndpoint
+			masterCIDR = cluster.PrivateClusterConfig.MasterIpv4CidrBlock
+		}
+
+		clusters = append(clusters, GcpGkeClusterInfo{
+			ID:                       cluster.Name, // Using Name as ID for simplicity
+			Name:                     cluster.Name,
+			Location:                 cluster.Location,
+			Status:                   cluster.Status,
+			Endpoint:                 cluster.Endpoint,
+			MasterVersion:            cluster.CurrentMasterVersion,
+			Network:                  extractNetworkName(cluster.Network),
+			Subnetwork:               extractLastPart(cluster.Subnetwork),
+			ClusterIpv4Cidr:          cluster.ClusterIpv4Cidr,
+			ServicesIpv4Cidr:         cluster.ServicesIpv4Cidr,
+			MasterIpv4Cidr:           masterCIDR,
+			PrivateCluster:           privateCluster,
+			MasterAuthorizedNetworks: masterAuthorizedNetworks,
+			NodePools:                nodePools,
+			VerticalPodAutoscaling:   cluster.VerticalPodAutoscaling != nil && cluster.VerticalPodAutoscaling.Enabled,
+			WorkloadIdentityConfig:   cluster.WorkloadIdentityConfig != nil && cluster.WorkloadIdentityConfig.WorkloadPool != "",
+		})
+	}
+
+	return clusters, nil
+}
+
+func (s *GcpDataService) FetchLoadBalancers(serviceAccountID string, projectID string) ([]GcpLoadBalancerInfo, error) {
+	credsJSON, err := s.getCredentials(serviceAccountID)
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := compute.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	var lbs []GcpLoadBalancerInfo
+
+	// 1. Forwarding Rules (Entry points)
+	aggList, err := service.ForwardingRules.AggregatedList(projectID).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	for key, item := range aggList.Items {
+		if item.ForwardingRules == nil {
+			continue
+		}
+		region := strings.ReplaceAll(key, "regions/", "")
+
+		for _, fr := range item.ForwardingRules {
+			lbType := "INTERNAL" // simplified inference
+			if fr.LoadBalancingScheme == "EXTERNAL" {
+				lbType = "EXTERNAL"
+			}
+
+			// Detect protocol
+			protocol := fr.IPProtocol
+
+			lbs = append(lbs, GcpLoadBalancerInfo{
+				ID:             fmt.Sprintf("%d", fr.Id),
+				Name:           fr.Name,
+				Type:           lbType,
+				Protocol:       protocol,
+				Region:         region,
+				IPAddress:      fr.IPAddress,
+				PortRange:      fr.PortRange,
+				BackendService: extractLastPart(fr.BackendService),
+			})
+		}
+	}
+
+	return lbs, nil
+}
+
+func (s *GcpDataService) FetchCloudArmorPolicies(serviceAccountID string, projectID string) ([]GcpCloudArmorPolicyInfo, error) {
+	credsJSON, err := s.getCredentials(serviceAccountID)
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := compute.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	// Security Policies are global usually
+	list, err := service.SecurityPolicies.List(projectID).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	var policies []GcpCloudArmorPolicyInfo
+	for _, sp := range list.Items {
+		var rules []GcpSecurityPolicyRuleInfo
+		for _, r := range sp.Rules {
+			action := "allow"
+			if r.Action == "deny(403)" || r.Action == "deny(404)" || r.Action == "deny(502)" {
+				action = "deny"
+			}
+
+			preview := false
+			if r.Preview {
+				preview = true
+			}
+
+			var srcIpRanges []string
+			if r.Match != nil && r.Match.Config != nil {
+				srcIpRanges = r.Match.Config.SrcIpRanges
+			} else if r.Match != nil && r.Match.Expr != nil {
+				// Handle expression matched rules if needed, or just set description
+				// For now, simpler handling to avoid panic
+			}
+
+			rules = append(rules, GcpSecurityPolicyRuleInfo{
+				Priority:    int(r.Priority),
+				Action:      action,
+				Preview:     preview,
+				SrcIpRanges: sliceToJSON(srcIpRanges),
+				Description: r.Description,
+			})
+		}
+
+		policies = append(policies, GcpCloudArmorPolicyInfo{
+			ID:          fmt.Sprintf("%d", sp.Id),
+			Name:        sp.Name,
+			Description: sp.Description,
+			Type:        sp.Type, // CLOUD_ARMOR or CLOUD_ARMOR_EDGE
+			Rules:       rules,
+		})
+	}
+
+	return policies, nil
 }

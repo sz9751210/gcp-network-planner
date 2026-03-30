@@ -7,38 +7,38 @@ docker compose up --build
 ```
 
 This will:
-- Build and start the backend API (Node.js, port 3001) / 建置並啟動後端 API（Node.js，端口 3001）
+- Build and start the backend API (Go, port 3001) / 建置並啟動後端 API（Go，端口 3001）
 - Build and start the frontend (port 3000) / 建置並啟動前端（端口 3000）
 - Create a persistent volume for database storage / 為資料庫建立持久化存儲
 
-### Using Go Backend / 使用 Go 後端
+### Node Fallback (Deprecated) / Node 備援（已棄用）
 
-The application supports both Node.js and Go backends. To use the Go backend:
+Node backend remains as a temporary deprecated fallback and is no longer the default path.
 
 ### English
 
 ```bash
-# Start with Go backend
-docker compose --profile go up --build
+# Start default stack (Go backend)
+docker compose up --build
 
 # View logs
-docker compose --profile go logs -f
+docker compose logs -f
 
 # Stop services
-docker compose --profile go down
+docker compose down
 ```
 
 ### 繁體中文
 
 ```bash
-# 使用 Go 後端啟動
-docker compose --profile go up --build
+# 使用預設堆疊（Go 後端）啟動
+docker compose up --build
 
 # 查看日誌
-docker compose --profile go logs -f
+docker compose logs -f
 
 # 停止服務
-docker compose --profile go down
+docker compose down
 ```
 
 ### Backend Comparison / 後端比較
@@ -46,9 +46,9 @@ docker compose --profile go down
 | Feature / 功能 | Node.js Backend | Go Backend |
 |---------------|----------------|------------|
 | Technology / 技術 | Node.js + Express + Prisma | Go + Echo + GORM |
-| Default Profile / 預設配置檔 | `node` | `go` |
-| Command to Start / 啟動指令 | `docker compose up` | `docker compose --profile go up` |
-| Database Volume / 資料庫卷 | `backend_data` | `go_backend_data` |
+| Default Status / 預設狀態 | Deprecated fallback | Active default |
+| Command to Start / 啟動指令 | N/A (fallback only) | `docker compose up` |
+| Database Volume / 資料庫卷 | N/A | `go_backend_data` |
 
 ## Access / 存取
 
@@ -130,7 +130,7 @@ docker compose down -v
 
 Check backend logs:
 ```bash
-docker compose logs backend
+docker compose logs go-backend
 ```
 
 Common issue: Invalid `ENCRYPTION_KEY`. Generate one:
@@ -144,7 +144,7 @@ Ensure both services are on the same Docker network. The `docker-compose.yml` se
 
 ### Database persistence / 資料庫持久化
 
-Database is stored in Docker volume `gcp-network-planner_backend_data`. To reset:
+Database is stored in Docker volume `go_backend_data`. To reset:
 ```bash
 docker compose down -v
 docker compose up --build

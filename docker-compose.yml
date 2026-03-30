@@ -1,5 +1,5 @@
 services:
-  # backend:
+  # backend (deprecated fallback for one release cycle):
   #   build:
   #     context: ./backend
   #     dockerfile: Dockerfile
@@ -34,7 +34,7 @@ services:
       - PORT=3001
       - DATABASE_URL=file:./dev.db
       - ENCRYPTION_KEY=936f2425316f73a12b9870492aef6733b9504147ef113a902065a59de4b0e946
-      - CORS_ORIGINS=${FRONTEND_URL:-http://localhost:3000},http://localhost:3031
+      - CORS_ORIGINS=${FRONTEND_URL:-http://localhost:3000}
     volumes:
       - go_backend_data:/app
     restart: unless-stopped
@@ -44,8 +44,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    profiles:
-      - go
 
   # frontend:
   #   build:
@@ -61,19 +59,17 @@ services:
   #   profiles:
   #     - node
 
-  frontend-go:
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3031:80"
+      - "3000:80"
     environment:
       - VITE_API_URL=${API_URL:-http://go-backend:3001}
     depends_on:
       - go-backend
     restart: unless-stopped
-    profiles:
-      - go
 
 volumes:
   # backend_data:

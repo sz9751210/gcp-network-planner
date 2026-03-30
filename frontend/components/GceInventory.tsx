@@ -162,9 +162,9 @@ export const GceInventory: React.FC<Props> = ({ projects, selectedProjectId }) =
 
       {/* Reusing Modal logic - kept simple as per request, just copying structure implicitly via component */}
       {selectedInstance && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 sm:px-6">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={() => setSelectedInstance(null)}></div>
-          <div className="relative bg-slate-800 rounded-xl shadow-2xl border border-slate-600 max-w-lg w-full transform transition-all p-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={() => setSelectedInstance(null)}></div>
+          <div className="relative bg-slate-800 rounded-xl shadow-2xl border border-slate-600 w-full max-w-2xl transform transition-all p-6 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
             <div className="flex justify-between items-start mb-6 border-b border-slate-700 pb-4">
               <div>
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">

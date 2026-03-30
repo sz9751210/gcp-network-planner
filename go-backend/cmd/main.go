@@ -46,10 +46,11 @@ func main() {
 	// Initialize services
 	credentialService := services.NewCredentialService(repo, encryption)
 	gcpDataService := services.NewGcpDataService(credentialService)
+	scanService := services.NewScanService(gcpDataService)
 
 	// Initialize handlers
 	credentialHandler := handlers.NewCredentialHandler(credentialService)
-	gcpHandler := handlers.NewGcpHandler(gcpDataService)
+	gcpHandler := handlers.NewGcpHandler(gcpDataService, scanService)
 
 	// Initialize Echo
 	e := echo.New()
@@ -86,6 +87,9 @@ func main() {
 	api.GET("/gcp/:projectId/vpcs", gcpHandler.GetVpcs)
 	api.GET("/gcp/:projectId/firewalls", gcpHandler.GetFirewallRules)
 	api.GET("/gcp/:projectId/instances", gcpHandler.GetInstances)
+	api.POST("/v1/scans", gcpHandler.CreateScan)
+	api.GET("/v1/scans/:scanId", gcpHandler.GetScan)
+	api.GET("/v1/inventory", gcpHandler.GetInventory)
 
 	// Graceful shutdown
 	go func() {

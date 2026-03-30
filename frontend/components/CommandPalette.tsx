@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GcpProject } from '../types';
+import { ViewType } from './Layout';
 
 interface Props {
   projects: GcpProject[];
-  onNavigate: (view: any, projectId: string) => void; // Simplified type for demo
+  onNavigate: (view: ViewType, projectId?: string) => void;
 }
 
 interface SearchResult {
@@ -12,7 +13,7 @@ interface SearchResult {
   title: string;
   subtitle: string;
   projectId: string;
-  view: string;
+  view: ViewType;
 }
 
 export const CommandPalette: React.FC<Props> = ({ projects, onNavigate }) => {

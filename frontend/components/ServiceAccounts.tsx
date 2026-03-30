@@ -20,8 +20,6 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  console.log('[ServiceAccounts] Rendering component');
-
   useEffect(() => {
     loadServiceAccounts();
   }, []);
@@ -56,36 +54,28 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[ServiceAccounts] handleFileSelect called');
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('[ServiceAccounts] File selected:', file.name);
     await processFile(file);
     event.target.value = '';
   };
 
   const processFile = async (file: File) => {
-    console.log('[ServiceAccounts] Processing file:', file.name);
     setUploadError(null);
     setUploading(true);
 
     try {
       const content = await file.text();
-      console.log('[ServiceAccounts] File content length:', content.length);
       const json = JSON.parse(content);
-      console.log('[ServiceAccounts] Parsed JSON keys:', Object.keys(json));
 
       const validation = validateServiceAccountKey(json);
-      console.log('[ServiceAccounts] Validation result:', validation);
       if (!validation.valid) {
         setUploadError(validation.error || 'Invalid service account key');
         return;
       }
 
       const name = json.client_email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '-') + '-service-account';
-      console.log('[ServiceAccounts] Generated name:', name);
-      console.log('[ServiceAccounts] Calling createServiceAccount API');
 
       await createServiceAccount(name, {
         type: json.type,
@@ -100,10 +90,9 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
         client_x509_cert_url: json.client_x509_cert_url,
       });
 
-      console.log('[ServiceAccounts] Service account created successfully');
       await loadServiceAccounts();
     } catch (err) {
-      console.error('[ServiceAccounts] Error processing file:', err);
+      console.error('Error processing service account file:', err);
       setUploadError(err instanceof Error ? err.message : 'Failed to upload service account');
     } finally {
       setUploading(false);
@@ -112,13 +101,11 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
 
   const handleDrop = async (event: React.DragEvent) => {
     event.preventDefault();
-    console.log('[ServiceAccounts] handleDrop called');
     setIsDragging(false);
 
     const file = event.dataTransfer.files[0];
     if (!file) return;
 
-    console.log('[ServiceAccounts] Dropped file:', file.name);
     if (!file.name.endsWith('.json')) {
       setUploadError('Please upload a JSON file');
       return;
@@ -129,13 +116,11 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
 
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
-    console.log('[ServiceAccounts] handleDragOver called');
     setIsDragging(true);
   };
 
   const handleDragLeave = (event: React.DragEvent) => {
     event.preventDefault();
-    console.log('[ServiceAccounts] handleDragLeave called');
     setIsDragging(false);
   };
 
@@ -227,7 +212,6 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
           />
           <button
             onClick={() => {
-              console.log('[ServiceAccounts] Upload button clicked');
               fileInputRef.current?.click();
             }}
             disabled={uploading}

@@ -9,10 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 type Encryption struct {
-	key []byte
+	key              []byte
+	legacyNodeSecret []byte
 }
 
 func NewEncryption(encryptionKey string) *Encryption {
@@ -25,16 +29,24 @@ func NewEncryption(encryptionKey string) *Encryption {
 		panic(fmt.Sprintf("Invalid ENCRYPTION_KEY: %v", err))
 	}
 
-	return &Encryption{key: key}
+	return &Encryption{
+		key:              key,
+		legacyNodeSecret: []byte(encryptionKey),
+	}
 }
 
 const (
-	algorithm     = "aes-256-gcm"
-	keyLength     = 32
-	ivLength      = 12
-	authTagLength = 16
-	saltLength    = 64
-	iterations    = 100000
+	algorithm  = "aes-256-gcm"
+	keyLength  = 32
+	iterations = 100000
+
+	currentVersionPrefix = "v2:"
+	currentSaltLength    = 16
+	currentNonceLength   = 12
+
+	nodeLegacySaltLength = 64
+	nodeLegacyIVLength   = 16
+	nodeLegacyTagLength  = 16
 )
 
 func (e *Encryption) Encrypt(plaintext string) (string, error) {
@@ -42,14 +54,14 @@ func (e *Encryption) Encrypt(plaintext string) (string, error) {
 		return "", errors.New("plaintext cannot be empty")
 	}
 
-	salt := make([]byte, saltLength)
+	salt := make([]byte, currentSaltLength)
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
 		return "", fmt.Errorf("failed to generate salt: %w", err)
 	}
 
-	iv := make([]byte, ivLength)
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return "", fmt.Errorf("failed to generate IV: %w", err)
+	nonce := make([]byte, currentNonceLength)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
 	key := e.deriveKey(salt)
@@ -64,14 +76,14 @@ func (e *Encryption) Encrypt(plaintext string) (string, error) {
 		return "", fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	ciphertext := aesgcm.Seal(nil, iv, []byte(plaintext), nil)
+	ciphertext := aesgcm.Seal(nil, nonce, []byte(plaintext), nil)
 
-	combined := make([]byte, 0, len(salt)+len(iv)+len(ciphertext))
+	combined := make([]byte, 0, len(salt)+len(nonce)+len(ciphertext))
 	combined = append(combined, salt...)
-	combined = append(combined, iv...)
+	combined = append(combined, nonce...)
 	combined = append(combined, ciphertext...)
 
-	return base64.StdEncoding.EncodeToString(combined), nil
+	return currentVersionPrefix + base64.StdEncoding.EncodeToString(combined), nil
 }
 
 func (e *Encryption) Decrypt(encryptedData string) (string, error) {
@@ -79,19 +91,39 @@ func (e *Encryption) Decrypt(encryptedData string) (string, error) {
 		return "", errors.New("encrypted data cannot be empty")
 	}
 
-	combined, err := base64.StdEncoding.DecodeString(encryptedData)
+	if strings.HasPrefix(encryptedData, currentVersionPrefix) {
+		return e.decryptCurrent(encryptedData)
+	}
+
+	// Legacy compatibility: Node.js format.
+	if legacy, err := e.decryptNodeLegacy(encryptedData); err == nil {
+		return legacy, nil
+	}
+
+	// Backward compatibility fallback: old Go payload without version prefix
+	// used the same payload layout as v2 (salt+nonce+ciphertextWithTag).
+	return e.decryptCurrent(currentVersionPrefix + encryptedData)
+}
+
+func (e *Encryption) decryptCurrent(versionedCiphertext string) (string, error) {
+	raw := strings.TrimPrefix(versionedCiphertext, currentVersionPrefix)
+
+	combined, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode base64: %w", err)
 	}
 
-	if len(combined) < saltLength+ivLength+authTagLength {
+	if len(combined) < currentSaltLength+currentNonceLength {
 		return "", errors.New("encrypted data too short")
 	}
 
-	salt := combined[:saltLength]
-	iv := combined[saltLength : saltLength+ivLength]
-	authTag := combined[saltLength+ivLength : saltLength+ivLength+authTagLength]
-	ciphertext := combined[saltLength+ivLength+authTagLength:]
+	salt := combined[:currentSaltLength]
+	nonce := combined[currentSaltLength : currentSaltLength+currentNonceLength]
+	ciphertext := combined[currentSaltLength+currentNonceLength:]
+
+	if len(ciphertext) == 0 {
+		return "", errors.New("encrypted payload missing ciphertext")
+	}
 
 	key := e.deriveKey(salt)
 
@@ -105,7 +137,7 @@ func (e *Encryption) Decrypt(encryptedData string) (string, error) {
 		return "", fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	plaintext, err := aesgcm.Open(nil, iv, append(authTag, ciphertext...), nil)
+	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt: %w", err)
 	}
@@ -114,16 +146,7 @@ func (e *Encryption) Decrypt(encryptedData string) (string, error) {
 }
 
 func (e *Encryption) deriveKey(salt []byte) []byte {
-	derivedKey := make([]byte, keyLength)
-	pbkdf2 := &pbkdf2{
-		password:   e.key,
-		salt:       salt,
-		iterations: iterations,
-		hashFunc:   func() interface{} { return sha256.New() },
-		keyLength:  keyLength,
-	}
-	pbkdf2.XORKeyStream(derivedKey)
-	return derivedKey
+	return pbkdf2.Key(e.key, salt, iterations, keyLength, sha256.New)
 }
 
 func IsValidEncryptionKey(key string) bool {
@@ -185,43 +208,38 @@ func hexCharToNibbleSimple(c byte) int {
 	return -1
 }
 
-type pbkdf2 struct {
-	password   []byte
-	salt       []byte
-	iterations int
-	hashFunc   func() interface{}
-	keyLength  int
-}
-
-func (p *pbkdf2) XORKeyStream(dst []byte) {
-	U := make([]byte, p.keyLength)
-	T := make([]byte, p.keyLength)
-
-	block := p.hashFunc().(interface {
-		Reset()
-		Write([]byte) (int, error)
-		Sum([]byte) []byte
-	})
-
-	for i := 0; len(dst) > 0; i++ {
-		block.Reset()
-		block.Write(p.salt)
-		block.Write([]byte{byte(i + 1), byte((i + 1) >> 8), byte((i + 1) >> 16), byte((i + 1) >> 24)})
-		block.Write(p.password)
-		U = block.Sum(nil)
-
-		copy(T, U)
-
-		for j := 1; j < p.iterations; j++ {
-			block.Reset()
-			block.Write(U)
-			U = block.Sum(nil)
-			for k := 0; k < p.keyLength; k++ {
-				T[k] ^= U[k]
-			}
-		}
-
-		copy(dst, T)
-		dst = dst[p.keyLength:]
+func (e *Encryption) decryptNodeLegacy(encryptedData string) (string, error) {
+	combined, err := base64.StdEncoding.DecodeString(encryptedData)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode legacy payload: %w", err)
 	}
+
+	if len(combined) < nodeLegacySaltLength+nodeLegacyIVLength+nodeLegacyTagLength {
+		return "", errors.New("legacy payload too short")
+	}
+
+	salt := combined[:nodeLegacySaltLength]
+	iv := combined[nodeLegacySaltLength : nodeLegacySaltLength+nodeLegacyIVLength]
+	authTag := combined[nodeLegacySaltLength+nodeLegacyIVLength : nodeLegacySaltLength+nodeLegacyIVLength+nodeLegacyTagLength]
+	ciphertext := combined[nodeLegacySaltLength+nodeLegacyIVLength+nodeLegacyTagLength:]
+
+	key := pbkdf2.Key(e.legacyNodeSecret, salt, iterations, keyLength, sha256.New)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to create legacy cipher: %w", err)
+	}
+
+	aesgcm, err := cipher.NewGCMWithNonceSize(block, nodeLegacyIVLength)
+	if err != nil {
+		return "", fmt.Errorf("failed to create legacy GCM: %w", err)
+	}
+
+	payload := append(ciphertext, authTag...)
+	plaintext, err := aesgcm.Open(nil, iv, payload, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt legacy payload: %w", err)
+	}
+
+	return string(plaintext), nil
 }

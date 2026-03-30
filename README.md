@@ -8,6 +8,9 @@ Google Cloud Network visualization and management tool with encrypted service ac
 
 Google Cloud 網路視覺化與管理工具，支援加密服務帳號憑證存儲。
 
+> Default backend is now **Go (Echo + GORM)**.  
+> Node backend is kept as a temporary deprecated fallback.
+
 View your app in AI Studio: https://ai.studio/apps/drive/1IQ3BZgXgKWa0G9c_3kuTk8oyi3P_XJh9
 
 ---
@@ -63,10 +66,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1IQ3BZgXgKWa0G9c_3kuTk8
          │ HTTP/JSON
          │
     ┌────────┴─────────┐
-    │   Backend API   │  Node.js + Express (Port 3001)
+    │   Backend API   │  Go + Echo (Port 3001)
     │                │
     │  ┌─────────────┐
-    │  │  Prisma ORM  │
+    │  │   GORM ORM   │
     │  │  (SQLite)     │
     │  └─────────────┘
     └─────────────────┘
@@ -83,10 +86,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1IQ3BZgXgKWa0G9c_3kuTk8
          │ HTTP/JSON
          │
     ┌────────┴─────────┐
-    │   後端 API    │  Node.js + Express (端口 3001)
+    │   後端 API    │  Go + Echo (端口 3001)
     │                │
     │  ┌─────────────┐
-    │  │  Prisma ORM  │
+    │  │   GORM ORM   │
     │  │  (SQLite)     │
     │  └─────────────┘
     └─────────────────┘
@@ -136,7 +139,7 @@ docker compose up --build
 
 ### English
 
-**Prerequisites:** Node.js 18+
+**Prerequisites:** Node.js 18+, Go 1.24+
 
 #### Frontend / 前端
 
@@ -153,29 +156,16 @@ echo "GEMINI_API_KEY=your_gemini_key_here" > .env.local
 npm run dev
 ```
 
-#### Backend / 後端
+#### Backend (Go) / 後端（Go）
 
 ```bash
-cd backend
+cd go-backend
 
-# Install dependencies
-npm install
-
-# Set environment variables
-cp .env.example .env
-# Edit .env and configure:
-#   - DATABASE_URL (SQLite: file:./dev.db)
-#   - ENCRYPTION_KEY (64-char hex string)
-#   - PORT (default: 3001)
-
-# Generate Prisma client
-npm run prisma:generate
-
-# Run database migrations
-npm run prisma:migrate
+# Download dependencies
+go mod tidy
 
 # Start backend dev server
-npm run dev
+make run
 ```
 
 #### Using Root Scripts (From Root / 使用根目錄腳本)
@@ -196,7 +186,7 @@ npm run dev
 
 ### 繁體中文
 
-**前置需求：** Node.js 18+
+**前置需求：** Node.js 18+、Go 1.24+
 
 #### Frontend / 前端
 
@@ -213,29 +203,16 @@ echo "GEMINI_API_KEY=your_gemini_key_here" > .env.local
 npm run dev
 ```
 
-#### Backend / 後端
+#### Backend (Go) / 後端（Go）
 
 ```bash
-cd backend
+cd go-backend
 
 # 安裝依賴
-npm install
-
-# 設定環境變數
-cp .env.example .env
-# 編輯 .env 並配置：
-#   - DATABASE_URL (SQLite: file:./dev.db)
-#   - ENCRYPTION_KEY (64 字元十六進位字串)
-#   - PORT (預設: 3001)
-
-# 生成 Prisma Client
-npm run prisma:generate
-
-# 執行資料庫遷移
-npm run prisma:migrate
+go mod tidy
 
 # 啟動後端開發伺服器
-npm run dev
+make run
 ```
 
 #### Using Root Scripts / 使用根目錄腳本
@@ -273,10 +250,18 @@ npm run dev
 | Method | 端點 | 說明 | Description |
 |---------|-----------|-------------|-------------|
 | GET | `/api/gcp?serviceAccountId=:id` | 取得所有 GCP 專案 | Fetch all GCP projects |
-| GET | `/api/gcp/all-data?serviceAccountId=:id` | 取得所有專案資料 | Fetch all project data (VPCs, instances, firewalls) |
+| GET | `/api/gcp/all-data?serviceAccountId=:id` | 相容別名（canonical inventory） | Compatibility alias for canonical inventory |
 | GET | `/api/gcp/:projectId/vpcs?serviceAccountId=:id` | 取得 VPC | Fetch VPCs for a project |
 | GET | `/api/gcp/:projectId/firewalls?serviceAccountId=:id` | 取得防火牆規則 | Fetch firewall rules |
 | GET | `/api/gcp/:projectId/instances?serviceAccountId=:id` | 取得運算實例 | Fetch compute instances |
+
+### Scan & Inventory (v1) / 掃描與資產清單（v1）
+
+| Method | 端點 | 說明 | Description |
+|---------|-----------|-------------|-------------|
+| POST | `/api/v1/scans` | 建立掃描工作 | Create asynchronous scan job |
+| GET | `/api/v1/scans/:scanId` | 查詢掃描狀態 | Get scan status and per-project errors |
+| GET | `/api/v1/inventory?serviceAccountId=:id` | 取得 canonical inventory | Fetch normalized project graph inventory |
 
 ---
 
@@ -319,22 +304,13 @@ gcp-network-planner/
 ├── docker-compose.yml  # Docker Compose configuration / Docker Compose 配置
 ├── nginx.conf         # Nginx reverse proxy config / Nginx 反向代理配置
 ├── .gitignore         # Git ignore / Git 忽略
-└── backend/           # Backend API (Node.js + Express + Prisma) / 後端 API
-    ├── src/
-    │   ├── server.ts           # Express server entry point
-    │   ├── routes/            # API endpoint handlers / API 端點處理器
-    │   ├── services/          # Business logic (GCP integration, credentials) / 業務邏輯（GCP 整合、憑證管理）
-    │   ├── utils/             # Utilities (encryption, database) / 工具（加密、資料庫）
-    │   └── types/             # TypeScript types / TypeScript 類型
-    ├── prisma/
-    │   ├── schema.prisma      # Database schema / 資料庫綱要
-    │   ├── seed.ts            # Database seed script / 資料庫種子腳本
-    │   └── migrations/        # Database migrations / 資料庫遷移
-    ├── package.json         # Backend dependencies / 後端依賴
-    ├── tsconfig.json       # Backend TypeScript config / 後端 TypeScript 配置
-    ├── Dockerfile          # Backend Dockerfile / 後端 Dockerfile
-    └── .env               # Environment variables / 環境變數
-└── frontend/           # Frontend App (React + Vite) / 前端應用程式（React + Vite）
+├── go-backend/        # Backend API (Go + Echo + GORM) / 後端 API（Go + Echo + GORM）
+│   ├── cmd/main.go         # Go server entry point / Go 伺服器進入點
+│   ├── internal/           # Handlers, services, repository, utils
+│   ├── Makefile            # Build/test/dev commands
+│   └── Dockerfile          # Backend Dockerfile / 後端 Dockerfile
+├── backend/           # Deprecated Node fallback / 已棄用 Node 備援
+└── frontend/          # Frontend App (React + Vite) / 前端應用程式（React + Vite）
     ├── App.tsx            # Main React component / 主要 React 組件
     ├── components/         # React components / React 組件
     ├── services/           # Frontend services / 前端服務
@@ -361,22 +337,13 @@ gcp-network-planner/
 ├── docker-compose.yml  # Docker Compose 配置
 ├── nginx.conf         # Nginx 反向代理配置
 ├── .gitignore         # Git 忽略
-└── backend/           # 後端 API（Node.js + Express + Prisma）
-    ├── src/
-    │   ├── server.ts           # Express 伺服器進入點
-    │   ├── routes/            # API 端點處理器
-    │   ├── services/          # 業務邏輯（GCP 整合、憑證管理）
-    │   ├── utils/             # 工具（加密、資料庫）
-    │   └── types/             # TypeScript 類型
-    ├── prisma/
-    │   ├── schema.prisma      # 資料庫綱要
-    │   ├── seed.ts            # 資料庫種子腳本
-    │   └── migrations/        # 資料庫遷移
-    ├── package.json         # 後端依賴
-    ├── tsconfig.json       # 後端 TypeScript 配置
-    ├── Dockerfile          # 後端 Dockerfile
-    └── .env               # 環境變數
-└── frontend/           # 前端應用程式（React + Vite）
+├── go-backend/        # 後端 API（Go + Echo + GORM）
+│   ├── cmd/main.go         # Go 伺服器進入點
+│   ├── internal/           # handlers/services/repository/utils
+│   ├── Makefile            # 建置/測試/開發指令
+│   └── Dockerfile          # 後端 Dockerfile
+├── backend/           # 已棄用 Node 備援
+└── frontend/          # 前端應用程式（React + Vite）
     ├── App.tsx            # 主要 React 組件
     ├── components/         # React 組件
     ├── services/           # 前端服務
@@ -412,7 +379,7 @@ For production deployment, refer to [DOCKER.md](./DOCKER.md) for detailed Docker
    ENCRYPTION_KEY=use_generated_key_from_step_1
    ```
 
-3. **Use PostgreSQL** for production (update `backend/prisma/schema.prisma`)
+3. **Use managed DB for production** and avoid local SQLite persistence.
 
 ### 繁體中文
 

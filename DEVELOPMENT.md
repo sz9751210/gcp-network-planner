@@ -5,7 +5,7 @@
 ```
 gcp-network-planner/
 ├── frontend/         # Frontend App (React + Vite)
-└── backend/          # Backend API (Node.js + Express + Prisma)
+└── go-backend/       # Backend API (Go + Echo + GORM)
 ```
 
 ## Quick Start / 快速啟動
@@ -35,9 +35,9 @@ npm install
 npm run dev
 
 # Backend
-cd backend
-npm install
-npm run dev
+cd go-backend
+go mod tidy
+make run
 ```
 
 ## Frontend Development / 前端開發
@@ -68,19 +68,19 @@ npm run build:frontend
 
 ## Backend Development / 後端開發
 
-The backend is a Node.js Express API with Prisma ORM.
+The default backend is a Go Echo API with GORM.
 
 ### Key Files / 主要檔案
 
-- `src/server.ts` - Express server entry point
-- `src/routes/` - API endpoint handlers
-- `src/services/` - Business logic (GCP integration, credentials)
-- `src/utils/` - Utilities (encryption, database)
-- `prisma/schema.prisma` - Database schema
+- `cmd/main.go` - Echo server entry point
+- `internal/handlers/` - API endpoint handlers
+- `internal/services/` - Business logic (GCP integration, scan jobs, credentials)
+- `internal/repository/` - GORM data access
+- `internal/utils/` - Encryption and helpers
 
 ### Environment Variables / 環境變數
 
-Create `backend/.env` from `backend/.env.example`:
+Create environment variables:
 ```bash
 DATABASE_URL="file:./dev.db"
 ENCRYPTION_KEY=your_64_char_hex_key_here
@@ -91,14 +91,9 @@ CORS_ORIGINS="http://localhost:3000"
 ### Database Operations / 資料庫操作
 
 ```bash
-# Generate Prisma client
-npm run backend:db:generate
-
-# Run migrations
-npm run backend:db:migrate
-
-# Open Prisma Studio (database GUI)
-npm run backend:db:studio
+# Auto-migrate runs on server start
+cd go-backend
+go test ./...
 ```
 
 ## Docker Development / Docker 開發
@@ -123,17 +118,20 @@ kill -9 <PID>
 ### Module Installation Issues / 模組安裝問題
 
 ```bash
-# Clear node_modules and reinstall
-rm -rf frontend/node_modules backend/node_modules node_modules
-rm -f package-lock.json frontend/package-lock.json backend/package-lock.json
+# Reinstall frontend dependencies
+rm -rf frontend/node_modules node_modules
+rm -f package-lock.json frontend/package-lock.json
 npm install
+
+# Refresh Go modules
+cd go-backend && go mod tidy
 ```
 
 ### Database Connection Issues / 資料庫連線問題
 
 ```bash
 # Reset database (WARNING: deletes data)
-cd backend
+cd go-backend
 rm -f dev.db
-npm run prisma:migrate
+make run
 ```
