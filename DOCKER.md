@@ -13,7 +13,7 @@ This will:
 
 ### Node Fallback (Deprecated) / Node 備援（已棄用）
 
-Node backend remains as a temporary deprecated fallback and is no longer the default path.
+Node backend remains as a temporary deprecated fallback, is feature-frozen, and is no longer the default path.
 
 ### English
 
@@ -76,7 +76,7 @@ VITE_API_URL=https://api.yourdomain.com
 
 # Backend
 ENCRYPTION_KEY=your_64_char_hex_key_here
-DATABASE_URL=postgresql://user:password@host:5432/database
+DATABASE_URL=file:./dev.db
 ```
 
 ### 繁體中文
@@ -87,7 +87,7 @@ VITE_API_URL=https://api.yourdomain.com
 
 # 後端
 ENCRYPTION_KEY=your_64_char_hex_key_here
-DATABASE_URL=postgresql://user:password@host:5432/database
+DATABASE_URL=file:./dev.db
 ```
 
 ## Managing Services / 管理服務

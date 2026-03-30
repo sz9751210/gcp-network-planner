@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 go-backend/bin/
+go-backend/main
 go-backend/*.db
 backend/prisma/dev.db
 backend/prisma/dev.db-journal

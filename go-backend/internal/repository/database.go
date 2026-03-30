@@ -44,6 +44,8 @@ func (d *Database) AutoMigrate() error {
 		&models.GcpRoute{},
 		&models.GcpInstance{},
 		&models.GcpFirewallRule{},
+		&models.ScanJob{},
+		&models.AuditEvent{},
 	)
 }
 

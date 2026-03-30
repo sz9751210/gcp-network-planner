@@ -131,13 +131,13 @@ func (s *GcpDataService) getCredentials(serviceAccountID string) ([]byte, error)
 	return s.credentialService.GetGoogleCredentials(serviceAccountID)
 }
 
-func (s *GcpDataService) FetchProjects(serviceAccountID string) ([]GcpProjectInfo, error) {
+func (s *GcpDataService) FetchProjects(ctx context.Context, serviceAccountID string) ([]GcpProjectInfo, error) {
 	credsJSON, err := s.getCredentials(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := cloudresourcemanager.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := cloudresourcemanager.NewService(ctx, option.WithCredentialsJSON(credsJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (s *GcpDataService) FetchProjects(serviceAccountID string) ([]GcpProjectInf
 
 	var projects []GcpProjectInfo
 
-	if err := req.Pages(context.Background(), func(page *cloudresourcemanager.SearchProjectsResponse) error {
+	if err := req.Pages(ctx, func(page *cloudresourcemanager.SearchProjectsResponse) error {
 		for _, project := range page.Projects {
 			if project.ProjectId == "" {
 				continue
@@ -166,18 +166,18 @@ func (s *GcpDataService) FetchProjects(serviceAccountID string) ([]GcpProjectInf
 	return projects, nil
 }
 
-func (s *GcpDataService) FetchVpcs(serviceAccountID string, projectID string) ([]GcpVpcInfo, error) {
+func (s *GcpDataService) FetchVpcs(ctx context.Context, serviceAccountID string, projectID string) ([]GcpVpcInfo, error) {
 	credsJSON, err := s.getCredentials(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
 	if err != nil {
 		return nil, err
 	}
 
-	networkList, err := service.Networks.List(projectID).Do()
+	networkList, err := service.Networks.List(projectID).Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -195,13 +195,13 @@ func (s *GcpDataService) FetchVpcs(serviceAccountID string, projectID string) ([
 	return vpcs, nil
 }
 
-func (s *GcpDataService) FetchSubnets(serviceAccountID string, projectID string, vpcSelfLink string) ([]GcpSubnetInfo, error) {
+func (s *GcpDataService) FetchSubnets(ctx context.Context, serviceAccountID string, projectID string, vpcSelfLink string) ([]GcpSubnetInfo, error) {
 	credsJSON, err := s.getCredentials(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func (s *GcpDataService) FetchSubnets(serviceAccountID string, projectID string,
 	var allSubnets []GcpSubnetInfo
 
 	// FIXED: Removed loop over regions. AggregatedList fetches all regions at once.
-	aggList, err := service.Subnetworks.AggregatedList(projectID).Do()
+	aggList, err := service.Subnetworks.AggregatedList(projectID).Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -243,18 +243,18 @@ func (s *GcpDataService) FetchSubnets(serviceAccountID string, projectID string,
 	return allSubnets, nil
 }
 
-func (s *GcpDataService) FetchFirewallRules(serviceAccountID string, projectID string) ([]GcpFirewallRuleInfo, error) {
+func (s *GcpDataService) FetchFirewallRules(ctx context.Context, serviceAccountID string, projectID string) ([]GcpFirewallRuleInfo, error) {
 	credsJSON, err := s.getCredentials(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
 	if err != nil {
 		return nil, err
 	}
 
-	firewallList, err := service.Firewalls.List(projectID).Do()
+	firewallList, err := service.Firewalls.List(projectID).Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -280,13 +280,13 @@ func (s *GcpDataService) FetchFirewallRules(serviceAccountID string, projectID s
 	return rules, nil
 }
 
-func (s *GcpDataService) FetchInstances(serviceAccountID string, projectID string) ([]GcpInstanceInfo, error) {
+func (s *GcpDataService) FetchInstances(ctx context.Context, serviceAccountID string, projectID string) ([]GcpInstanceInfo, error) {
 	credsJSON, err := s.getCredentials(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (s *GcpDataService) FetchInstances(serviceAccountID string, projectID strin
 	var allInstances []GcpInstanceInfo
 
 	// FIXED: Used AggregatedList instead of looping through hardcoded zones
-	aggList, err := service.Instances.AggregatedList(projectID).Do()
+	aggList, err := service.Instances.AggregatedList(projectID).Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -438,19 +438,19 @@ func deniedToJSON(denied []*compute.FirewallDenied) string {
 	return result
 }
 
-func (s *GcpDataService) FetchGkeClusters(serviceAccountID string, projectID string) ([]GcpGkeClusterInfo, error) {
+func (s *GcpDataService) FetchGkeClusters(ctx context.Context, serviceAccountID string, projectID string) ([]GcpGkeClusterInfo, error) {
 	credsJSON, err := s.getCredentials(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := container.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := container.NewService(ctx, option.WithCredentialsJSON(credsJSON))
 	if err != nil {
 		return nil, err
 	}
 
 	parent := fmt.Sprintf("projects/%s/locations/-", projectID)
-	response, err := service.Projects.Locations.Clusters.List(parent).Do()
+	response, err := service.Projects.Locations.Clusters.List(parent).Context(ctx).Do()
 	if err != nil {
 		// Log error but allow empty return if API is not enabled or permission denied,
 		// though ideally we should handle it better. For now, nil is fine.
@@ -513,13 +513,13 @@ func (s *GcpDataService) FetchGkeClusters(serviceAccountID string, projectID str
 	return clusters, nil
 }
 
-func (s *GcpDataService) FetchLoadBalancers(serviceAccountID string, projectID string) ([]GcpLoadBalancerInfo, error) {
+func (s *GcpDataService) FetchLoadBalancers(ctx context.Context, serviceAccountID string, projectID string) ([]GcpLoadBalancerInfo, error) {
 	credsJSON, err := s.getCredentials(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -527,7 +527,7 @@ func (s *GcpDataService) FetchLoadBalancers(serviceAccountID string, projectID s
 	var lbs []GcpLoadBalancerInfo
 
 	// 1. Forwarding Rules (Entry points)
-	aggList, err := service.ForwardingRules.AggregatedList(projectID).Do()
+	aggList, err := service.ForwardingRules.AggregatedList(projectID).Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -563,19 +563,19 @@ func (s *GcpDataService) FetchLoadBalancers(serviceAccountID string, projectID s
 	return lbs, nil
 }
 
-func (s *GcpDataService) FetchCloudArmorPolicies(serviceAccountID string, projectID string) ([]GcpCloudArmorPolicyInfo, error) {
+func (s *GcpDataService) FetchCloudArmorPolicies(ctx context.Context, serviceAccountID string, projectID string) ([]GcpCloudArmorPolicyInfo, error) {
 	credsJSON, err := s.getCredentials(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
 	if err != nil {
 		return nil, err
 	}
 
 	// Security Policies are global usually
-	list, err := service.SecurityPolicies.List(projectID).Do()
+	list, err := service.SecurityPolicies.List(projectID).Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}

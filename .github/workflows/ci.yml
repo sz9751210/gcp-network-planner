@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  frontend-build:
+  frontend-quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,16 +17,23 @@ jobs:
           cache: "npm"
       - name: Install Dependencies
         run: npm ci
+      - name: Frontend Type Check
+        run: npm run typecheck --workspace=frontend
+      - name: Frontend Regression Tests
+        run: npm run test --workspace=frontend
       - name: Build Frontend
         run: npm run build --workspace=frontend
 
-  go-backend-test:
+  go-backend-quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24.x"
+      - name: Build Go Backend
+        working-directory: go-backend
+        run: go build -o bin/server ./cmd/main.go
       - name: Run Go Tests
         working-directory: go-backend
         run: go test ./...

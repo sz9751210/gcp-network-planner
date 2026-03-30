@@ -33,6 +33,15 @@ function App() {
   const [lastScannedAt, setLastScannedAt] = useState<string>('');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
+  const resolveLastScannedAt = (projectData: GcpProject[], fallback: string): string => {
+    const latest = projectData
+      .map((project) => project.lastScannedAt)
+      .filter((value) => value)
+      .sort()
+      .at(-1);
+    return latest || fallback;
+  };
+
   // Navigation State
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   // Global Project Filter State
@@ -74,14 +83,14 @@ function App() {
       if (finalScan.status === 'failed') {
         const fallback = await fetchInventory(accountId);
         setProjects(fallback);
-        setLastScannedAt(new Date().toISOString());
+        setLastScannedAt(resolveLastScannedAt(fallback, new Date().toISOString()));
         setLoadingProgress('Scan failed. Showing latest available inventory.');
         await new Promise((resolve) => setTimeout(resolve, 1500));
       } else {
         const finalProjects = finalScan.projects.length > 0 ? finalScan.projects : await fetchInventory(accountId);
         setProjects(finalProjects);
         setScanErrors(finalScan.errors);
-        setLastScannedAt(finalScan.completedAt || new Date().toISOString());
+        setLastScannedAt(resolveLastScannedAt(finalProjects, finalScan.completedAt || new Date().toISOString()));
         setLoadingProgress('');
       }
     } catch (error) {

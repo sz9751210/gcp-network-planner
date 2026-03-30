@@ -32,8 +32,8 @@ export interface GcpVpc {
   isSharedVpcHost: boolean;
   subnets: GcpSubnet[];
   mtu?: number;
-  peerings?: GcpVpcPeering[]; 
-  routes?: GcpRoute[]; // Added Routes
+  peerings: GcpVpcPeering[];
+  routes: GcpRoute[]; // Added Routes
 }
 
 export interface GcpInstance {
@@ -90,7 +90,7 @@ export interface GcpCloudArmorPolicy {
   type: 'CLOUD_ARMOR' | 'CLOUD_ARMOR_EDGE'; // Backend vs Edge
   rulesCount: number;
   adaptiveProtection: boolean; // Managed Protection
-  rules?: GcpCloudArmorRule[]; // Detailed rules
+  rules: GcpCloudArmorRule[]; // Detailed rules
 }
 
 export interface GcpLoadBalancer {
@@ -216,8 +216,10 @@ export interface GcpProject {
   firewallRules: GcpFirewallRule[];
   loadBalancers: GcpLoadBalancer[]; // Added LBs
   armorPolicies: GcpCloudArmorPolicy[]; // Added Cloud Armor
-  iamPolicy?: GcpIamBinding[]; // Added IAM
+  iamPolicy: GcpIamBinding[]; // Added IAM
   gkeClusters: GcpGkeCluster[]; // Added GKE
+  lastScannedAt: string;
+  stale: boolean;
   error?: string; // To track permission errors during fetching
 }
 

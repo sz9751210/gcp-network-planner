@@ -140,6 +140,35 @@ type GcpFirewallRule struct {
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
+type ScanJob struct {
+	ID                string     `gorm:"primaryKey;size:128" json:"id"`
+	ServiceAccountID  string     `gorm:"size:21;not null;index" json:"serviceAccountId"`
+	Actor             string     `gorm:"size:255;not null;default:system" json:"actor"`
+	Scope             string     `gorm:"size:32;not null" json:"scope"`
+	Status            string     `gorm:"size:32;not null;index" json:"status"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	StartedAt         *time.Time `json:"startedAt,omitempty"`
+	CompletedAt       *time.Time `json:"completedAt,omitempty"`
+	TotalProjects     int        `json:"totalProjects"`
+	CompletedProjects int        `json:"completedProjects"`
+	ProjectsJSON      string     `gorm:"type:text;not null" json:"-"`
+	ErrorsJSON        string     `gorm:"type:text;not null" json:"-"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
+}
+
+type AuditEvent struct {
+	ID           string    `gorm:"primaryKey;size:21" json:"id"`
+	Timestamp    time.Time `gorm:"not null;index" json:"timestamp"`
+	Actor        string    `gorm:"size:255;not null" json:"actor"`
+	Action       string    `gorm:"size:128;not null;index" json:"action"`
+	TargetType   string    `gorm:"size:64;not null" json:"targetType"`
+	TargetID     string    `gorm:"size:255" json:"targetId"`
+	Result       string    `gorm:"size:32;not null;index" json:"result"`
+	ErrorSummary string    `gorm:"size:1024" json:"errorSummary,omitempty"`
+	MetadataJSON string    `gorm:"type:text" json:"-"`
+	CreatedAt    time.Time `json:"createdAt"`
+}
+
 // TableName overrides the default table name for ServiceAccount
 func (ServiceAccount) TableName() string {
 	return "service_accounts"
@@ -178,6 +207,14 @@ func (GcpInstance) TableName() string {
 // TableName overrides the default table name for GcpFirewallRule
 func (GcpFirewallRule) TableName() string {
 	return "gcp_firewall_rules"
+}
+
+func (ScanJob) TableName() string {
+	return "scan_jobs"
+}
+
+func (AuditEvent) TableName() string {
+	return "audit_events"
 }
 
 // BeforeCreate hooks for ID generation
@@ -233,6 +270,16 @@ func (i *GcpInstance) BeforeCreate(tx *gorm.DB) (err error) {
 func (f *GcpFirewallRule) BeforeCreate(tx *gorm.DB) (err error) {
 	if f.ID == "" {
 		f.ID = generateID()
+	}
+	return nil
+}
+
+func (e *AuditEvent) BeforeCreate(tx *gorm.DB) (err error) {
+	if e.ID == "" {
+		e.ID = generateID()
+	}
+	if e.Timestamp.IsZero() {
+		e.Timestamp = time.Now().UTC()
 	}
 	return nil
 }

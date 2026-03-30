@@ -19,6 +19,8 @@ const (
 type BuildInventoryOptions struct {
 	ProjectConcurrency int
 	ProjectTimeout     time.Duration
+	OnProjectsLoaded   func(totalProjects int)
+	OnProjectCompleted func(projectID string, graph ProjectGraph, projectErr error)
 }
 
 type ProjectFirewallPort struct {
@@ -193,11 +195,12 @@ func (s *GcpDataService) BuildInventory(ctx context.Context, serviceAccountID st
 		options.ProjectTimeout = defaultProjectTimeout
 	}
 
-	projects, err := callWithContext(ctx, func() ([]GcpProjectInfo, error) {
-		return s.FetchProjects(serviceAccountID)
-	})
+	projects, err := s.FetchProjects(ctx, serviceAccountID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch projects: %w", err)
+	}
+	if options.OnProjectsLoaded != nil {
+		options.OnProjectsLoaded(len(projects))
 	}
 
 	results := make([]ProjectGraph, len(projects))
@@ -219,6 +222,9 @@ func (s *GcpDataService) BuildInventory(ctx context.Context, serviceAccountID st
 
 			graph, projectErr := s.BuildProjectGraph(projectCtx, serviceAccountID, p)
 			results[i] = graph
+			if options.OnProjectCompleted != nil {
+				options.OnProjectCompleted(p.ProjectID, graph, projectErr)
+			}
 			if projectErr != nil {
 				scanErrorsMu.Lock()
 				scanErrors = append(scanErrors, ProjectScanError{
@@ -261,17 +267,13 @@ func (s *GcpDataService) BuildProjectGraph(ctx context.Context, serviceAccountID
 
 	projectErrors := make([]string, 0)
 
-	vpcs, err := callWithContext(ctx, func() ([]GcpVpcInfo, error) {
-		return s.FetchVpcs(serviceAccountID, project.ProjectID)
-	})
+	vpcs, err := s.FetchVpcs(ctx, serviceAccountID, project.ProjectID)
 	if err != nil {
 		projectErrors = append(projectErrors, fmt.Sprintf("vpcs: %v", err))
 		vpcs = make([]GcpVpcInfo, 0)
 	}
 
-	allSubnets, err := callWithContext(ctx, func() ([]GcpSubnetInfo, error) {
-		return s.FetchSubnets(serviceAccountID, project.ProjectID, "")
-	})
+	allSubnets, err := s.FetchSubnets(ctx, serviceAccountID, project.ProjectID, "")
 	if err != nil {
 		projectErrors = append(projectErrors, fmt.Sprintf("subnets: %v", err))
 		allSubnets = make([]GcpSubnetInfo, 0)
@@ -289,9 +291,7 @@ func (s *GcpDataService) BuildProjectGraph(ctx context.Context, serviceAccountID
 		})
 	}
 
-	firewallRules, err := callWithContext(ctx, func() ([]GcpFirewallRuleInfo, error) {
-		return s.FetchFirewallRules(serviceAccountID, project.ProjectID)
-	})
+	firewallRules, err := s.FetchFirewallRules(ctx, serviceAccountID, project.ProjectID)
 	if err != nil {
 		projectErrors = append(projectErrors, fmt.Sprintf("firewallRules: %v", err))
 		firewallRules = make([]GcpFirewallRuleInfo, 0)
@@ -314,9 +314,7 @@ func (s *GcpDataService) BuildProjectGraph(ctx context.Context, serviceAccountID
 		})
 	}
 
-	instances, err := callWithContext(ctx, func() ([]GcpInstanceInfo, error) {
-		return s.FetchInstances(serviceAccountID, project.ProjectID)
-	})
+	instances, err := s.FetchInstances(ctx, serviceAccountID, project.ProjectID)
 	if err != nil {
 		projectErrors = append(projectErrors, fmt.Sprintf("instances: %v", err))
 		instances = make([]GcpInstanceInfo, 0)
@@ -338,9 +336,7 @@ func (s *GcpDataService) BuildProjectGraph(ctx context.Context, serviceAccountID
 		})
 	}
 
-	gkeClusters, err := callWithContext(ctx, func() ([]GcpGkeClusterInfo, error) {
-		return s.FetchGkeClusters(serviceAccountID, project.ProjectID)
-	})
+	gkeClusters, err := s.FetchGkeClusters(ctx, serviceAccountID, project.ProjectID)
 	if err != nil {
 		projectErrors = append(projectErrors, fmt.Sprintf("gkeClusters: %v", err))
 		gkeClusters = make([]GcpGkeClusterInfo, 0)
@@ -375,9 +371,7 @@ func (s *GcpDataService) BuildProjectGraph(ctx context.Context, serviceAccountID
 		})
 	}
 
-	loadBalancers, err := callWithContext(ctx, func() ([]GcpLoadBalancerInfo, error) {
-		return s.FetchLoadBalancers(serviceAccountID, project.ProjectID)
-	})
+	loadBalancers, err := s.FetchLoadBalancers(ctx, serviceAccountID, project.ProjectID)
 	if err != nil {
 		projectErrors = append(projectErrors, fmt.Sprintf("loadBalancers: %v", err))
 		loadBalancers = make([]GcpLoadBalancerInfo, 0)
@@ -401,9 +395,7 @@ func (s *GcpDataService) BuildProjectGraph(ctx context.Context, serviceAccountID
 		})
 	}
 
-	armorPolicies, err := callWithContext(ctx, func() ([]GcpCloudArmorPolicyInfo, error) {
-		return s.FetchCloudArmorPolicies(serviceAccountID, project.ProjectID)
-	})
+	armorPolicies, err := s.FetchCloudArmorPolicies(ctx, serviceAccountID, project.ProjectID)
 	if err != nil {
 		projectErrors = append(projectErrors, fmt.Sprintf("armorPolicies: %v", err))
 		armorPolicies = make([]GcpCloudArmorPolicyInfo, 0)
@@ -543,25 +535,4 @@ func defaultRegion(region string) string {
 		return "global"
 	}
 	return region
-}
-
-func callWithContext[T any](ctx context.Context, fn func() (T, error)) (T, error) {
-	type result struct {
-		value T
-		err   error
-	}
-
-	ch := make(chan result, 1)
-	go func() {
-		v, err := fn()
-		ch <- result{value: v, err: err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		var zero T
-		return zero, ctx.Err()
-	case res := <-ch:
-		return res.value, res.err
-	}
 }

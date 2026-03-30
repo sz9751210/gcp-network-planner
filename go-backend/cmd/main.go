@@ -46,10 +46,11 @@ func main() {
 	// Initialize services
 	credentialService := services.NewCredentialService(repo, encryption)
 	gcpDataService := services.NewGcpDataService(credentialService)
-	scanService := services.NewScanService(gcpDataService)
+	auditService := services.NewAuditService(repo)
+	scanService := services.NewScanService(gcpDataService, repo, auditService)
 
 	// Initialize handlers
-	credentialHandler := handlers.NewCredentialHandler(credentialService)
+	credentialHandler := handlers.NewCredentialHandler(credentialService, auditService)
 	gcpHandler := handlers.NewGcpHandler(gcpDataService, scanService)
 
 	// Initialize Echo
@@ -62,7 +63,7 @@ func main() {
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins:     cfg.CORSOrigins,
 		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
-		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, "X-Actor"},
 		AllowCredentials: true,
 	}))
 

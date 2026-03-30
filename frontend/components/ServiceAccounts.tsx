@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchServiceAccounts, createServiceAccount, deleteServiceAccount, testServiceAccount, type ServiceAccount } from '../services/api';
+import {
+  fetchServiceAccounts,
+  createServiceAccount,
+  deleteServiceAccount,
+  testServiceAccount,
+  type ServiceAccount,
+  type ServiceAccountKey,
+} from '../services/api';
 
 interface TestResult {
   success: boolean;
@@ -8,6 +15,19 @@ interface TestResult {
 
 interface ServiceAccountsProps {
   onSelectAccount: (accountId: string) => void;
+}
+
+interface UnknownRecord {
+  [key: string]: unknown;
+}
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null;
+}
+
+function toRequiredString(record: UnknownRecord, field: string): string {
+  const value = record[field];
+  return typeof value === 'string' ? value : '';
 }
 
 export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccount }) => {
@@ -38,19 +58,38 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
     }
   };
 
-  const validateServiceAccountKey = (key: any): { valid: boolean; error?: string } => {
+  const validateServiceAccountKey = (
+    value: unknown
+  ): { valid: boolean; error?: string; key?: ServiceAccountKey } => {
+    if (!isRecord(value)) {
+      return { valid: false, error: 'Service account key must be a JSON object.' };
+    }
+
     const required = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id', 'auth_uri', 'token_uri', 'auth_provider_x509_cert_url', 'client_x509_cert_url'];
-    const missing = required.filter(field => !key[field]);
+    const missing = required.filter((field) => !toRequiredString(value, field));
 
     if (missing.length > 0) {
       return { valid: false, error: `Missing required fields: ${missing.join(', ')}` };
     }
 
-    if (key.type !== 'service_account') {
+    if (toRequiredString(value, 'type') !== 'service_account') {
       return { valid: false, error: 'Invalid service account key type. Expected "service_account".' };
     }
 
-    return { valid: true };
+    const key: ServiceAccountKey = {
+      type: 'service_account',
+      project_id: toRequiredString(value, 'project_id'),
+      private_key_id: toRequiredString(value, 'private_key_id'),
+      private_key: toRequiredString(value, 'private_key'),
+      client_email: toRequiredString(value, 'client_email'),
+      client_id: toRequiredString(value, 'client_id'),
+      auth_uri: toRequiredString(value, 'auth_uri'),
+      token_uri: toRequiredString(value, 'token_uri'),
+      auth_provider_x509_cert_url: toRequiredString(value, 'auth_provider_x509_cert_url'),
+      client_x509_cert_url: toRequiredString(value, 'client_x509_cert_url'),
+    };
+
+    return { valid: true, key };
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,21 +113,14 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
         setUploadError(validation.error || 'Invalid service account key');
         return;
       }
+      if (!validation.key) {
+        setUploadError('Invalid service account key');
+        return;
+      }
 
-      const name = json.client_email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '-') + '-service-account';
+      const name = validation.key.client_email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '-') + '-service-account';
 
-      await createServiceAccount(name, {
-        type: json.type,
-        project_id: json.project_id,
-        private_key_id: json.private_key_id,
-        private_key: json.private_key,
-        client_email: json.client_email,
-        client_id: json.client_id,
-        auth_uri: json.auth_uri,
-        token_uri: json.token_uri,
-        auth_provider_x509_cert_url: json.auth_provider_x509_cert_url,
-        client_x509_cert_url: json.client_x509_cert_url,
-      });
+      await createServiceAccount(name, validation.key);
 
       await loadServiceAccounts();
     } catch (err) {

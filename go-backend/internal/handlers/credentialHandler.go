@@ -12,11 +12,13 @@ import (
 
 type CredentialHandler struct {
 	credentialService *services.CredentialService
+	auditService      *services.AuditService
 }
 
-func NewCredentialHandler(credentialService *services.CredentialService) *CredentialHandler {
+func NewCredentialHandler(credentialService *services.CredentialService, auditService *services.AuditService) *CredentialHandler {
 	return &CredentialHandler{
 		credentialService: credentialService,
+		auditService:      auditService,
 	}
 }
 
@@ -46,10 +48,30 @@ func (h *CredentialHandler) CreateServiceAccount(c echo.Context) error {
 
 	account, err := h.credentialService.CreateServiceAccount(input)
 	if err != nil {
+		h.auditService.Record(c.Request().Context(), services.AuditEventInput{
+			Actor:        actorFromRequest(c),
+			Action:       "credential.create",
+			TargetType:   "service_account",
+			TargetID:     req.Name,
+			Result:       "failed",
+			ErrorSummary: err.Error(),
+		})
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error": "Failed to create service account",
 		})
 	}
+
+	h.auditService.Record(c.Request().Context(), services.AuditEventInput{
+		Actor:      actorFromRequest(c),
+		Action:     "credential.create",
+		TargetType: "service_account",
+		TargetID:   account.ID,
+		Result:     "success",
+		Metadata: map[string]string{
+			"projectId": account.ProjectID,
+			"email":     account.AccountEmail,
+		},
+	})
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"id":           account.ID,
@@ -113,6 +135,14 @@ func (h *CredentialHandler) DeleteServiceAccount(c echo.Context) error {
 
 	err := h.credentialService.DeleteServiceAccount(id)
 	if err != nil {
+		h.auditService.Record(c.Request().Context(), services.AuditEventInput{
+			Actor:        actorFromRequest(c),
+			Action:       "credential.delete",
+			TargetType:   "service_account",
+			TargetID:     id,
+			Result:       "failed",
+			ErrorSummary: err.Error(),
+		})
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.JSON(http.StatusNotFound, map[string]interface{}{
 				"error": "Service account not found",
@@ -122,6 +152,14 @@ func (h *CredentialHandler) DeleteServiceAccount(c echo.Context) error {
 			"error": "Failed to delete service account",
 		})
 	}
+
+	h.auditService.Record(c.Request().Context(), services.AuditEventInput{
+		Actor:      actorFromRequest(c),
+		Action:     "credential.delete",
+		TargetType: "service_account",
+		TargetID:   id,
+		Result:     "success",
+	})
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"message": "Service account deleted successfully",
@@ -133,11 +171,34 @@ func (h *CredentialHandler) TestConnection(c echo.Context) error {
 
 	success, msg, err := h.credentialService.TestConnection(id)
 	if err != nil {
+		h.auditService.Record(c.Request().Context(), services.AuditEventInput{
+			Actor:        actorFromRequest(c),
+			Action:       "credential.test",
+			TargetType:   "service_account",
+			TargetID:     id,
+			Result:       "failed",
+			ErrorSummary: err.Error(),
+		})
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to test connection",
 			"details": err.Error(),
 		})
 	}
+
+	result := "failed"
+	if success {
+		result = "success"
+	}
+	h.auditService.Record(c.Request().Context(), services.AuditEventInput{
+		Actor:      actorFromRequest(c),
+		Action:     "credential.test",
+		TargetType: "service_account",
+		TargetID:   id,
+		Result:     result,
+		Metadata: map[string]string{
+			"message": msg,
+		},
+	})
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"success": success,

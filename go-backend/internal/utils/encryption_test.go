@@ -72,6 +72,38 @@ func TestDecryptUnversionedCurrentPayloadFallback(t *testing.T) {
 	}
 }
 
+func TestDecryptWithWrongKeyFails(t *testing.T) {
+	keyA := "936f2425316f73a12b9870492aef6733b9504147ef113a902065a59de4b0e946"
+	keyB := "836f2425316f73a12b9870492aef6733b9504147ef113a902065a59de4b0e946"
+
+	encA := NewEncryption(keyA)
+	encB := NewEncryption(keyB)
+
+	ciphertext, err := encA.Encrypt("secret-value")
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	if _, err := encB.Decrypt(ciphertext); err == nil {
+		t.Fatalf("expected decrypt with wrong key to fail")
+	}
+}
+
+func TestDecryptCorruptedPayloadFails(t *testing.T) {
+	key := "936f2425316f73a12b9870492aef6733b9504147ef113a902065a59de4b0e946"
+	enc := NewEncryption(key)
+
+	ciphertext, err := enc.Encrypt("corrupt-me")
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	corrupted := ciphertext[:len(ciphertext)-2] + "xx"
+	if _, err := enc.Decrypt(corrupted); err == nil {
+		t.Fatalf("expected decrypt with corrupted payload to fail")
+	}
+}
+
 func encryptNodeLegacyForTest(encryptionKey string, plaintext string) (string, error) {
 	salt := make([]byte, nodeLegacySaltLength)
 	iv := make([]byte, nodeLegacyIVLength)

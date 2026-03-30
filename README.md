@@ -9,7 +9,7 @@ Google Cloud Network visualization and management tool with encrypted service ac
 Google Cloud 網路視覺化與管理工具，支援加密服務帳號憑證存儲。
 
 > Default backend is now **Go (Echo + GORM)**.  
-> Node backend is kept as a temporary deprecated fallback.
+> Node backend is kept as a temporary deprecated fallback (feature frozen, scheduled for removal after compatibility window).
 
 View your app in AI Studio: https://ai.studio/apps/drive/1IQ3BZgXgKWa0G9c_3kuTk8oyi3P_XJh9
 
@@ -24,6 +24,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1IQ3BZgXgKWa0G9c_3kuTk8
 - [API Endpoints / API 端點](#api-endpoints--api-端點)
 - [Security / 安全性](#security-安全性)
 - [Project Structure / 專案結構](#project-structure-專案結構)
+- [Engineering Docs / 工程文件](#engineering-docs--工程文件)
 
 ---
 
@@ -273,9 +274,9 @@ npm run dev
 - **PBKDF2 Key Derivation**: 100,000 iterations with salt for each operation
 - **Per-operation Salt & IV**: Maximum security for each encrypted value
 - **CORS Configuration**: Configured for specific origins
-- **Helmet.js**: Security headers
 - **Soft Delete**: `isActive` flag for data recovery
 - **Environment Variables**: Never commit `.env` files to version control
+- **Audit Events**: credential and scan operations persisted in `audit_events`
 
 ### 繁體中文
 
@@ -283,9 +284,17 @@ npm run dev
 - **PBKDF2 金鑰衍生**：每次操作使用 100,000 次疊代與鹽值
 - **每次操作的鹽值與 IV**：為每個加密值提供最大安全性
 - **CORS 配置**：為特定的來源進行配置
-- **Helmet.js**：安全性標頭
 - **軟刪除**：使用 `isActive` 旗標進行資料復原
 - **環境變數**：絕不將 `.env` 檔案提交到版本控制
+- **審計事件**：憑證與掃描操作寫入 `audit_events`
+
+---
+
+## Engineering Docs / 工程文件
+
+- [docs/progress/phase2-go-stabilization.md](./docs/progress/phase2-go-stabilization.md)
+- [docs/architecture/current-state.md](./docs/architecture/current-state.md)
+- [docs/testing/quality-gates.md](./docs/testing/quality-gates.md)
 
 ---
 
@@ -399,7 +408,7 @@ For production deployment, refer to [DOCKER.md](./DOCKER.md) for detailed Docker
    ENCRYPTION_KEY=使用步驟1生成的金鑰
    ```
 
-3. **使用 PostgreSQL** 用於生產（更新 `backend/prisma/schema.prisma`）
+3. **生產建議**：將 `DATABASE_URL` 指向受管理資料庫（預設仍可使用 SQLite），並保留 Go backend 單一路徑部署。
 
 ---
 

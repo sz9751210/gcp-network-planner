@@ -12,6 +12,7 @@
     "build:frontend": "npm run build --workspace=frontend",
     "build:backend": "cd go-backend && GOCACHE=/tmp/go-build go build -o bin/server ./cmd/main.go",
     "build:backend:node": "cd backend && npm run build",
+    "typecheck": "npm run typecheck --workspace=frontend",
     "test:backend": "cd go-backend && GOCACHE=/tmp/go-build go test ./...",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",

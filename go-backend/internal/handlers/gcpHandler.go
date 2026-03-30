@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -29,7 +31,7 @@ func (h *GcpHandler) GetProjects(c echo.Context) error {
 		})
 	}
 
-	projects, err := h.gcpDataService.FetchProjects(serviceAccountID)
+	projects, err := h.gcpDataService.FetchProjects(c.Request().Context(), serviceAccountID)
 	if err != nil {
 		fmt.Printf("Error fetching projects for SA %s: %v\n", serviceAccountID, err)
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
@@ -54,7 +56,7 @@ func (h *GcpHandler) CreateScan(c echo.Context) error {
 		})
 	}
 
-	record, err := h.scanService.CreateScan(req.ServiceAccountID, req.Scope)
+	record, err := h.scanService.CreateScan(req.ServiceAccountID, req.Scope, actorFromRequest(c))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": err.Error(),
@@ -90,7 +92,7 @@ func (h *GcpHandler) GetInventory(c echo.Context) error {
 		})
 	}
 
-	inventory, scanErrors, err := h.resolveInventory(serviceAccountID)
+	inventory, scanErrors, err := h.resolveInventory(c.Request().Context(), serviceAccountID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to fetch GCP inventory",
@@ -114,7 +116,7 @@ func (h *GcpHandler) GetAllProjectData(c echo.Context) error {
 		})
 	}
 
-	inventory, _, err := h.resolveInventory(serviceAccountID)
+	inventory, _, err := h.resolveInventory(c.Request().Context(), serviceAccountID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to fetch GCP project data",
@@ -135,7 +137,7 @@ func (h *GcpHandler) GetVpcs(c echo.Context) error {
 
 	projectID := c.Param("projectId")
 
-	vpcs, err := h.gcpDataService.FetchVpcs(serviceAccountID, projectID)
+	vpcs, err := h.gcpDataService.FetchVpcs(c.Request().Context(), serviceAccountID, projectID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to fetch VPCs",
@@ -156,7 +158,7 @@ func (h *GcpHandler) GetFirewallRules(c echo.Context) error {
 
 	projectID := c.Param("projectId")
 
-	rules, err := h.gcpDataService.FetchFirewallRules(serviceAccountID, projectID)
+	rules, err := h.gcpDataService.FetchFirewallRules(c.Request().Context(), serviceAccountID, projectID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to fetch firewall rules",
@@ -177,7 +179,7 @@ func (h *GcpHandler) GetInstances(c echo.Context) error {
 
 	projectID := c.Param("projectId")
 
-	instances, err := h.gcpDataService.FetchInstances(serviceAccountID, projectID)
+	instances, err := h.gcpDataService.FetchInstances(c.Request().Context(), serviceAccountID, projectID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to fetch instances",
@@ -188,10 +190,18 @@ func (h *GcpHandler) GetInstances(c echo.Context) error {
 	return c.JSON(http.StatusOK, instances)
 }
 
-func (h *GcpHandler) resolveInventory(serviceAccountID string) ([]services.ProjectGraph, []services.ProjectScanError, error) {
+func (h *GcpHandler) resolveInventory(ctx context.Context, serviceAccountID string) ([]services.ProjectGraph, []services.ProjectScanError, error) {
 	if inventory, ok := h.scanService.GetLatestCompletedInventory(serviceAccountID); ok {
 		return inventory, make([]services.ProjectScanError, 0), nil
 	}
 
-	return h.scanService.BuildInventoryNow(serviceAccountID)
+	return h.scanService.BuildInventoryNow(ctx, serviceAccountID)
+}
+
+func actorFromRequest(c echo.Context) string {
+	actor := strings.TrimSpace(c.Request().Header.Get("X-Actor"))
+	if actor == "" {
+		return "system"
+	}
+	return actor
 }

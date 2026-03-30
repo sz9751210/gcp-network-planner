@@ -10,7 +10,7 @@ interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onExport: (format: string) => void;
-  data: any[];
+  data: unknown[];
 }
 
 export const exportFormats: ExportFormat[] = [

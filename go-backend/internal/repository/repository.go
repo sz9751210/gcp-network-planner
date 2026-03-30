@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"github.com/code-yeongyu/gcp-network-planner/go-backend/internal/models"
@@ -111,4 +112,42 @@ func (r *Repository) DeleteGcpFirewallRulesByNetwork(network string) error {
 
 func (r *Repository) DeleteGcpInstancesByNetwork(network string) error {
 	return r.db.Where("network = ?", network).Delete(&models.GcpInstance{}).Error
+}
+
+func (r *Repository) UpsertScanJob(job *models.ScanJob) error {
+	return r.db.Save(job).Error
+}
+
+func (r *Repository) GetScanJobByID(id string) (*models.ScanJob, error) {
+	var job models.ScanJob
+	err := r.db.Where("id = ?", id).First(&job).Error
+	if err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (r *Repository) ListScanJobs() ([]models.ScanJob, error) {
+	var jobs []models.ScanJob
+	err := r.db.Order("created_at DESC").Find(&jobs).Error
+	return jobs, err
+}
+
+func (r *Repository) GetLatestCompletedScanJobByServiceAccount(serviceAccountID string) (*models.ScanJob, error) {
+	var job models.ScanJob
+	err := r.db.
+		Where("service_account_id = ? AND status IN ?", serviceAccountID, []string{"success", "partial"}).
+		Order("completed_at DESC").
+		First(&job).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (r *Repository) CreateAuditEvent(event *models.AuditEvent) error {
+	return r.db.Create(event).Error
 }

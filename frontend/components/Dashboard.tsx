@@ -10,6 +10,14 @@ interface Props {
   lastScannedAt: string;
 }
 
+interface StatsCardProps {
+  title: string;
+  value: string | number;
+  subtext: string;
+  icon: React.ReactNode;
+  trend: 'up' | 'down' | 'stable';
+}
+
 export const Dashboard: React.FC<Props> = ({
   projects,
   selectedProjectId,
@@ -66,6 +74,11 @@ export const Dashboard: React.FC<Props> = ({
     return 'text-slate-400 border-slate-700 bg-slate-800/40';
   }, [scanStatus]);
 
+  const staleProjects = useMemo(
+    () => activeProjects.filter((project) => project.stale).length,
+    [activeProjects]
+  );
+
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
@@ -93,6 +106,9 @@ export const Dashboard: React.FC<Props> = ({
           </div>
           <span className="text-xs text-slate-400">
             Error Count: <span className="text-slate-200 font-semibold">{scanErrors.length}</span>
+          </span>
+          <span className="text-xs text-slate-400">
+            Stale Projects: <span className="text-slate-200 font-semibold">{staleProjects}</span>
           </span>
         </div>
         {scanErrors.length > 0 && (
@@ -210,7 +226,7 @@ export const Dashboard: React.FC<Props> = ({
   );
 };
 
-const StatsCard = ({ title, value, subtext, icon, trend }: any) => (
+const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtext, icon, trend }) => (
   <div className="bg-slate-800 rounded-xl border border-slate-700 p-5 hover:bg-slate-750 transition-colors shadow-sm group">
     <div className="flex justify-between items-start">
       <div>

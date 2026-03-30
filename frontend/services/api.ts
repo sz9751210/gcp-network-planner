@@ -1,4 +1,14 @@
-import { GcpProject } from '../types';
+import {
+  FirewallPort,
+  GcpCloudArmorPolicy,
+  GcpFirewallRule,
+  GcpGkeCluster,
+  GcpIamBinding,
+  GcpInstance,
+  GcpLoadBalancer,
+  GcpProject,
+  GcpVpc,
+} from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -121,28 +131,30 @@ function toRecordStringMap(value: unknown): Record<string, string> {
   return result;
 }
 
-function normalizeFirewallPorts(value: unknown): { IPProtocol: string; ports?: string[] }[] {
-  return toArrayValue(value)
-    .map((item) => {
-      if (!isRecord(item)) {
-        return null;
-      }
-      const protocol = toStringValue(item.IPProtocol);
-      if (!protocol) {
-        return null;
-      }
-      const ports = toStringArray(item.ports);
-      return ports.length > 0
-        ? { IPProtocol: protocol, ports }
-        : { IPProtocol: protocol };
-    })
-    .filter((item): item is { IPProtocol: string; ports?: string[] } => item !== null);
+function normalizeFirewallPorts(value: unknown): FirewallPort[] {
+  const result: FirewallPort[] = [];
+  toArrayValue(value).forEach((item) => {
+    if (!isRecord(item)) {
+      return;
+    }
+    const protocol = toStringValue(item.IPProtocol);
+    if (!protocol) {
+      return;
+    }
+    const ports = toStringArray(item.ports);
+    if (ports.length > 0) {
+      result.push({ IPProtocol: protocol, ports });
+      return;
+    }
+    result.push({ IPProtocol: protocol });
+  });
+  return result;
 }
 
 function normalizeProject(project: unknown): GcpProject {
   const record = isRecord(project) ? project : {};
 
-  const vpcs = toArrayValue(record.vpcs).map((vpc) => {
+  const vpcs: GcpVpc[] = toArrayValue(record.vpcs).map((vpc) => {
     const vpcRecord = isRecord(vpc) ? vpc : {};
     return {
       name: toStringValue(vpcRecord.name),
@@ -186,7 +198,7 @@ function normalizeProject(project: unknown): GcpProject {
     };
   });
 
-  const instances = toArrayValue(record.instances).map((instance) => {
+  const instances: GcpInstance[] = toArrayValue(record.instances).map((instance) => {
     const instanceRecord = isRecord(instance) ? instance : {};
     return {
       id: toStringValue(instanceRecord.id),
@@ -203,7 +215,7 @@ function normalizeProject(project: unknown): GcpProject {
     };
   });
 
-  const firewallRules = toArrayValue(record.firewallRules).map((rule) => {
+  const firewallRules: GcpFirewallRule[] = toArrayValue(record.firewallRules).map((rule) => {
     const ruleRecord = isRecord(rule) ? rule : {};
     return {
       id: toStringValue(ruleRecord.id),
@@ -222,7 +234,7 @@ function normalizeProject(project: unknown): GcpProject {
     };
   });
 
-  const loadBalancers = toArrayValue(record.loadBalancers).map((lb) => {
+  const loadBalancers: GcpLoadBalancer[] = toArrayValue(record.loadBalancers).map((lb) => {
     const lbRecord = isRecord(lb) ? lb : {};
     const backends = toStringArray(lbRecord.backends);
     const legacyBackend = toStringValue(lbRecord.backendService);
@@ -243,7 +255,7 @@ function normalizeProject(project: unknown): GcpProject {
     };
   });
 
-  const armorPolicies = toArrayValue(record.armorPolicies).map((policy) => {
+  const armorPolicies: GcpCloudArmorPolicy[] = toArrayValue(record.armorPolicies).map((policy) => {
     const policyRecord = isRecord(policy) ? policy : {};
     const rules = toArrayValue(policyRecord.rules).map((rule) => {
       const ruleRecord = isRecord(rule) ? rule : {};
@@ -269,7 +281,7 @@ function normalizeProject(project: unknown): GcpProject {
     };
   });
 
-  const iamPolicy = toArrayValue(record.iamPolicy).map((binding) => {
+  const iamPolicy: GcpIamBinding[] = toArrayValue(record.iamPolicy).map((binding) => {
     const bindingRecord = isRecord(binding) ? binding : {};
     return {
       role: toStringValue(bindingRecord.role),
@@ -284,7 +296,7 @@ function normalizeProject(project: unknown): GcpProject {
     };
   });
 
-  const gkeClusters = toArrayValue(record.gkeClusters).map((cluster) => {
+  const gkeClusters: GcpGkeCluster[] = toArrayValue(record.gkeClusters).map((cluster) => {
     const clusterRecord = isRecord(cluster) ? cluster : {};
     return {
       id: toStringValue(clusterRecord.id),
@@ -331,6 +343,8 @@ function normalizeProject(project: unknown): GcpProject {
     armorPolicies,
     iamPolicy,
     gkeClusters,
+    lastScannedAt: toStringValue(record.lastScannedAt),
+    stale: toBooleanValue(record.stale),
     error: toStringValue(record.error) || undefined,
   };
 }

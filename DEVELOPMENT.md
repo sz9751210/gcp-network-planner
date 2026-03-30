@@ -1,5 +1,7 @@
 # Development Guide / 開發指南
 
+> Backend default: Go only. Node backend is compatibility fallback and feature-frozen.
+
 ## Project Structure / 專案結構
 
 ```
@@ -64,6 +66,8 @@ VITE_API_URL=http://localhost:3001
 
 ```bash
 npm run build:frontend
+npm run typecheck --workspace=frontend
+npm run test --workspace=frontend
 ```
 
 ## Backend Development / 後端開發
@@ -94,11 +98,18 @@ CORS_ORIGINS="http://localhost:3000"
 # Auto-migrate runs on server start
 cd go-backend
 go test ./...
+go build -o bin/server ./cmd/main.go
 ```
 
 ## Docker Development / Docker 開發
 
 See [DOCKER.md](./DOCKER.md) for Docker setup.
+
+## Engineering Docs / 工程文件
+
+- `docs/progress/phase2-go-stabilization.md`
+- `docs/architecture/current-state.md`
+- `docs/testing/quality-gates.md`
 
 ## Troubleshooting / 疑難排解
 

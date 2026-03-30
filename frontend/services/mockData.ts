@@ -1,5 +1,7 @@
 import { GcpProject } from '../types';
 
+const DEFAULT_SCANNED_AT = '2026-03-31T00:00:00Z';
+
 export const MOCK_PROJECTS: GcpProject[] = [
   {
     projectId: 'host-project-prod-01',
@@ -216,7 +218,9 @@ export const MOCK_PROJECTS: GcpProject[] = [
            }
         ]
       }
-    ]
+    ],
+    lastScannedAt: DEFAULT_SCANNED_AT,
+    stale: false
   },
   {
     projectId: 'service-app-frontend-01',
@@ -253,6 +257,7 @@ export const MOCK_PROJECTS: GcpProject[] = [
         name: 'default',
         id: 'vpc-2',
         isSharedVpcHost: false,
+        peerings: [],
         routes: [
            {
             id: 'rt-3',
@@ -368,7 +373,9 @@ export const MOCK_PROJECTS: GcpProject[] = [
         members: ['serviceAccount:frontend-sa@service-app-frontend-01.iam.gserviceaccount.com']
       }
     ],
-    gkeClusters: []
+    gkeClusters: [],
+    lastScannedAt: DEFAULT_SCANNED_AT,
+    stale: false
   },
   {
     projectId: 'data-analytics-dev',
@@ -542,7 +549,9 @@ export const MOCK_PROJECTS: GcpProject[] = [
            }
         ]
       }
-    ]
+    ],
+    lastScannedAt: DEFAULT_SCANNED_AT,
+    stale: false
   },
   {
     projectId: 'legacy-monolith',
@@ -555,6 +564,8 @@ export const MOCK_PROJECTS: GcpProject[] = [
     loadBalancers: [],
     armorPolicies: [],
     iamPolicy: [],
-    gkeClusters: []
+    gkeClusters: [],
+    lastScannedAt: DEFAULT_SCANNED_AT,
+    stale: true
   }
 ];
