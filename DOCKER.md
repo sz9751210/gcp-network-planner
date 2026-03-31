@@ -13,7 +13,7 @@ This will:
 
 ### Node Fallback (Deprecated) / Node 備援（已棄用）
 
-Node backend remains as a temporary deprecated fallback, is feature-frozen, and is no longer the default path.
+Node backend remains as a temporary deprecated fallback, is feature-frozen, and is no longer the default path. It is scheduled for removal in the next release cycle.
 
 ### English
 

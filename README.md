@@ -9,7 +9,7 @@ Google Cloud Network visualization and management tool with encrypted service ac
 Google Cloud 網路視覺化與管理工具，支援加密服務帳號憑證存儲。
 
 > Default backend is now **Go (Echo + GORM)**.  
-> Node backend is kept as a temporary deprecated fallback (feature frozen, scheduled for removal after compatibility window).
+> Node backend is kept as a temporary deprecated fallback (feature frozen, scheduled for removal in the next release cycle).
 
 View your app in AI Studio: https://ai.studio/apps/drive/1IQ3BZgXgKWa0G9c_3kuTk8oyi3P_XJh9
 
@@ -183,6 +183,9 @@ npm run dev:backend
 
 # Start both in separate terminals
 npm run dev
+
+# Legacy fallback only (manual enable path)
+npm run legacy:backend:node
 ```
 
 ### 繁體中文
@@ -230,6 +233,9 @@ npm run dev:backend
 
 # 同時啟動兩者（在不同終端機）
 npm run dev
+
+# 僅供舊版相容備援（手動啟用）
+npm run legacy:backend:node
 ```
 
 ---
@@ -261,8 +267,10 @@ npm run dev
 | Method | 端點 | 說明 | Description |
 |---------|-----------|-------------|-------------|
 | POST | `/api/v1/scans` | 建立掃描工作 | Create asynchronous scan job |
+| GET | `/api/v1/scans` | 列出掃描歷史（支援 filter/cursor） | List scan history with filters and cursor pagination |
 | GET | `/api/v1/scans/:scanId` | 查詢掃描狀態 | Get scan status and per-project errors |
 | GET | `/api/v1/inventory?serviceAccountId=:id` | 取得 canonical inventory | Fetch normalized project graph inventory |
+| GET | `/api/v1/audit-events` | 列出審計事件（支援 filter/cursor） | List audit events with filters and cursor pagination |
 
 ---
 
@@ -277,6 +285,7 @@ npm run dev
 - **Soft Delete**: `isActive` flag for data recovery
 - **Environment Variables**: Never commit `.env` files to version control
 - **Audit Events**: credential and scan operations persisted in `audit_events`
+- **Retention Policy**: audit events older than 90 days are cleaned up automatically
 
 ### 繁體中文
 
@@ -287,6 +296,7 @@ npm run dev
 - **軟刪除**：使用 `isActive` 旗標進行資料復原
 - **環境變數**：絕不將 `.env` 檔案提交到版本控制
 - **審計事件**：憑證與掃描操作寫入 `audit_events`
+- **保留策略**：超過 90 天的審計事件會自動清理
 
 ---
 

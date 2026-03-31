@@ -2,6 +2,8 @@ package repository
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/code-yeongyu/gcp-network-planner/go-backend/internal/models"
@@ -10,6 +12,30 @@ import (
 
 type Repository struct {
 	db *gorm.DB
+}
+
+type ScanJobListFilter struct {
+	ServiceAccountID string
+	Status           string
+	From             *time.Time
+	To               *time.Time
+	CursorCreatedAt  *time.Time
+	CursorID         string
+	Limit            int
+}
+
+type AuditEventListFilter struct {
+	From            *time.Time
+	To              *time.Time
+	Action          string
+	Result          string
+	TargetType      string
+	TargetID        string
+	Actor           string
+	ScanID          string
+	CursorTimestamp *time.Time
+	CursorID        string
+	Limit           int
 }
 
 func NewRepository(database *Database) *Repository {
@@ -150,4 +176,117 @@ func (r *Repository) GetLatestCompletedScanJobByServiceAccount(serviceAccountID 
 
 func (r *Repository) CreateAuditEvent(event *models.AuditEvent) error {
 	return r.db.Create(event).Error
+}
+
+func (r *Repository) ListScanJobsFiltered(filter ScanJobListFilter) ([]models.ScanJob, error) {
+	query := r.db.Model(&models.ScanJob{})
+
+	if filter.ServiceAccountID != "" {
+		query = query.Where("service_account_id = ?", filter.ServiceAccountID)
+	}
+	if filter.Status != "" {
+		query = query.Where("status = ?", filter.Status)
+	}
+	if filter.From != nil {
+		query = query.Where("created_at >= ?", filter.From.UTC())
+	}
+	if filter.To != nil {
+		query = query.Where("created_at <= ?", filter.To.UTC())
+	}
+	if filter.CursorCreatedAt != nil {
+		if filter.CursorID != "" {
+			query = query.Where(
+				"(created_at < ?) OR (created_at = ? AND id < ?)",
+				filter.CursorCreatedAt.UTC(),
+				filter.CursorCreatedAt.UTC(),
+				filter.CursorID,
+			)
+		} else {
+			query = query.Where("created_at < ?", filter.CursorCreatedAt.UTC())
+		}
+	}
+
+	limit := normalizeLimit(filter.Limit, 20, 200)
+	jobs := make([]models.ScanJob, 0, limit)
+	err := query.
+		Order("created_at DESC").
+		Order("id DESC").
+		Limit(limit).
+		Find(&jobs).Error
+	return jobs, err
+}
+
+func (r *Repository) ListAuditEventsFiltered(filter AuditEventListFilter) ([]models.AuditEvent, error) {
+	query := r.db.Model(&models.AuditEvent{})
+
+	if filter.From != nil {
+		query = query.Where("timestamp >= ?", filter.From.UTC())
+	}
+	if filter.To != nil {
+		query = query.Where("timestamp <= ?", filter.To.UTC())
+	}
+	if filter.Action != "" {
+		query = query.Where("action = ?", filter.Action)
+	}
+	if filter.Result != "" {
+		query = query.Where("result = ?", filter.Result)
+	}
+	if filter.TargetType != "" {
+		query = query.Where("target_type = ?", filter.TargetType)
+	}
+	if filter.TargetID != "" {
+		query = query.Where("target_id = ?", filter.TargetID)
+	}
+	if filter.Actor != "" {
+		query = query.Where("actor = ?", filter.Actor)
+	}
+	if filter.ScanID != "" {
+		metadataLike := fmt.Sprintf("%%\"scanId\":\"%s\"%%", escapeLikeValue(filter.ScanID))
+		query = query.Where("(target_id = ? OR metadata_json LIKE ? ESCAPE '\\')", filter.ScanID, metadataLike)
+	}
+	if filter.CursorTimestamp != nil {
+		if filter.CursorID != "" {
+			query = query.Where(
+				"(timestamp < ?) OR (timestamp = ? AND id < ?)",
+				filter.CursorTimestamp.UTC(),
+				filter.CursorTimestamp.UTC(),
+				filter.CursorID,
+			)
+		} else {
+			query = query.Where("timestamp < ?", filter.CursorTimestamp.UTC())
+		}
+	}
+
+	limit := normalizeLimit(filter.Limit, 20, 200)
+	events := make([]models.AuditEvent, 0, limit)
+	err := query.
+		Order("timestamp DESC").
+		Order("id DESC").
+		Limit(limit).
+		Find(&events).Error
+	return events, err
+}
+
+func (r *Repository) DeleteAuditEventsBefore(cutoff time.Time) (int64, error) {
+	result := r.db.Where("timestamp < ?", cutoff.UTC()).Delete(&models.AuditEvent{})
+	return result.RowsAffected, result.Error
+}
+
+func normalizeLimit(input int, fallback int, max int) int {
+	if input <= 0 {
+		return fallback
+	}
+	if input > max {
+		return max
+	}
+	return input
+}
+
+func escapeLikeValue(raw string) string {
+	replacer := strings.NewReplacer(
+		"\\", "\\\\",
+		"%", "\\%",
+		"_", "\\_",
+	)
+	return replacer.Replace(raw)
 }

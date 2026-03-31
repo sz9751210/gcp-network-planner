@@ -67,7 +67,7 @@ func (h *CredentialHandler) CreateServiceAccount(c echo.Context) error {
 		TargetType: "service_account",
 		TargetID:   account.ID,
 		Result:     "success",
-		Metadata: map[string]string{
+		Metadata: map[string]any{
 			"projectId": account.ProjectID,
 			"email":     account.AccountEmail,
 		},
@@ -195,7 +195,7 @@ func (h *CredentialHandler) TestConnection(c echo.Context) error {
 		TargetType: "service_account",
 		TargetID:   id,
 		Result:     result,
-		Metadata: map[string]string{
+		Metadata: map[string]any{
 			"message": msg,
 		},
 	})

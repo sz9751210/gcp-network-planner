@@ -12,6 +12,7 @@
   - Credentials: create/list/delete/test.
   - Scan engine: async queue, status machine (`queued/running/partial/success/failed`).
   - Inventory: canonical `ProjectGraph[]` via `/api/v1/inventory` and `/api/gcp/all-data` alias.
+  - Operations: list scans (`GET /api/v1/scans`) and audit trail (`GET /api/v1/audit-events`) with cursor pagination.
 - Storage:
   - `service_accounts` for encrypted keys.
   - `scan_jobs` for persisted scan state/results.
@@ -25,6 +26,7 @@
 5. Running progress updates are persisted (`totalProjects` / `completedProjects` / per-project errors).
 6. Final project graphs are stored and exposed via scan status and inventory endpoints.
 7. Audit events are recorded for credential and scan operations.
+8. Operations UI queries scan/audit list endpoints and links audit events back to scan details.
 
 ## Reliability Policies
 - Scan concurrency default: `4`.
@@ -32,3 +34,4 @@
 - Whole scan deadline default: `8m`.
 - Freshness policy: stale if older than `15m`; fallback inventory after failed scan is forced stale.
 - Restart behavior: queued/running jobs from previous process are marked failed (`interrupted by server restart`), while completed scans remain queryable.
+- Audit retention: `90d`; startup cleanup + every 6 hours background cleanup.

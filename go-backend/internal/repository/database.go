@@ -35,7 +35,7 @@ func NewDatabase(dsn string) (*Database, error) {
 }
 
 func (d *Database) AutoMigrate() error {
-	return d.DB.AutoMigrate(
+	if err := d.DB.AutoMigrate(
 		&models.ServiceAccount{},
 		&models.GcpProject{},
 		&models.GcpVpc{},
@@ -46,7 +46,20 @@ func (d *Database) AutoMigrate() error {
 		&models.GcpFirewallRule{},
 		&models.ScanJob{},
 		&models.AuditEvent{},
-	)
+	); err != nil {
+		return err
+	}
+
+	indexDDL := []string{
+		"CREATE INDEX IF NOT EXISTS idx_audit_events_query ON audit_events(timestamp DESC, action, result, target_type, actor)",
+		"CREATE INDEX IF NOT EXISTS idx_scan_jobs_query ON scan_jobs(service_account_id, created_at DESC, status)",
+	}
+	for _, ddl := range indexDDL {
+		if err := d.DB.Exec(ddl).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *Database) Close() error {

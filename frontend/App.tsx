@@ -19,6 +19,7 @@ import { GkeStorage } from './components/GkeStorage';
 import { GkeConfiguration } from './components/GkeConfiguration';
 import { CommandPalette } from './components/CommandPalette';
 import { ServiceAccounts } from './components/ServiceAccounts';
+import { Operations } from './components/Operations';
 import { fetchInventory, fetchScan, startScan, type ScanRecord } from './services/api';
 import { GcpProject } from './types';
 
@@ -135,6 +136,7 @@ function App() {
   const renderContent = () => {
     switch (currentView) {
       case 'service_accounts': return <ServiceAccounts onSelectAccount={handleServiceAccountChange} />;
+      case 'operations': return <Operations selectedServiceAccountId={selectedServiceAccountId} />;
       case 'dashboard': return (
         <Dashboard
           projects={projects}

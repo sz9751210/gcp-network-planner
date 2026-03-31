@@ -25,6 +25,18 @@ Owner: Platform Team
 | Build artifact hygiene | Completed | CI/local build commands standardized to `-o bin/server`; ignored accidental `go-backend/main`. |
 | Audit actor propagation readiness | Completed | CORS allowlist now includes `X-Actor` header. |
 
+## Phase 3 Operations-first Progress
+
+| Item | Status | Notes |
+|---|---|---|
+| `GET /api/v1/scans` list API | Completed | Added filter + cursor pagination response (`items`, `nextCursor`). |
+| `GET /api/v1/audit-events` list API | Completed | Added filter + cursor pagination with canonical metadata object output. |
+| Scan audit traceability metadata | Completed | `scan.finish/fail` now emit `scanId/serviceAccountId/projects/errors/durationMs`. |
+| Audit retention policy (`90d`) | Completed | Startup cleanup + 6-hour background cleanup worker. |
+| DB query indexes | Completed | Added indexes for `audit_events` and `scan_jobs` query paths. |
+| Operations frontend view | Completed | Added Scan History + Audit Trail with filter, copy, and audit-to-scan linkage. |
+| Node sunset preparation | Completed | Root/frontend scripts now Go-first by default; Node kept as legacy manual path. |
+
 ## Change Log
 
 ### 2026-03-31
@@ -34,3 +46,6 @@ Owner: Platform Team
 - Added contract/integration/smoke tests and frontend regression suite.
 - Added CI gates for typecheck/test/build across frontend and Go backend.
 - Hardened build artifact hygiene and `X-Actor` transport compatibility.
+- Added operations APIs (`/api/v1/scans`, `/api/v1/audit-events`) with cursor pagination and filters.
+- Added audit retention worker (90-day policy) and DB query indexes.
+- Added Operations page with scan/audit traceability and copy-to-clipboard utilities.

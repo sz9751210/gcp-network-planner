@@ -3,6 +3,7 @@ import { GcpProject } from '../types';
 
 export type ViewType =
   | 'dashboard'
+  | 'operations'
   | 'service_accounts'
   | 'topology'
   | 'peering'
@@ -49,6 +50,11 @@ export const Layout: React.FC<LayoutProps> = ({
     {
       title: 'Core Platform',
       items: [
+        {
+          id: 'operations',
+          label: 'Operations',
+          icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2z" /></svg>
+        },
         {
           id: 'dashboard',
           label: 'Overview',
@@ -269,7 +275,7 @@ export const Layout: React.FC<LayoutProps> = ({
                    onChange={(e) => onProjectChange(e.target.value)}
                    className="appearance-none bg-transparent text-white text-sm focus:outline-none min-w-[180px] cursor-pointer"
                  >
-                   <option value="all">Entire Organization</option>
+                   <option value="all">All Loaded Projects</option>
                    <optgroup label="Active Projects">
                       {projects.map(p => (
                         <option key={p.projectId} value={p.projectId}>

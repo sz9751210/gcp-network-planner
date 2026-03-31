@@ -21,6 +21,8 @@ const (
 	scanProjectConcurrency = 4
 	scanProjectTimeout     = 20 * time.Second
 	inventoryStaleAfter    = 15 * time.Minute
+	defaultScanListLimit   = 20
+	maxScanListLimit       = 100
 )
 
 type ScanStatus string
@@ -46,6 +48,32 @@ type ScanRecord struct {
 	CompletedProjects int                `json:"completedProjects"`
 	Projects          []ProjectGraph     `json:"projects"`
 	Errors            []ProjectScanError `json:"errors"`
+}
+
+type ScanListFilters struct {
+	ServiceAccountID string
+	Status           string
+	From             *time.Time
+	To               *time.Time
+	Limit            int
+	Cursor           string
+}
+
+type ScanListItem struct {
+	ScanID            string     `json:"scanId"`
+	ServiceAccountID  string     `json:"serviceAccountId"`
+	Actor             string     `json:"actor"`
+	Status            ScanStatus `json:"status"`
+	CreatedAt         string     `json:"createdAt"`
+	CompletedAt       string     `json:"completedAt,omitempty"`
+	TotalProjects     int        `json:"totalProjects"`
+	CompletedProjects int        `json:"completedProjects"`
+	ErrorCount        int        `json:"errorCount"`
+}
+
+type ScanListResponse struct {
+	Items      []ScanListItem `json:"items"`
+	NextCursor string         `json:"nextCursor,omitempty"`
 }
 
 type InventoryBuilder interface {
@@ -123,7 +151,8 @@ func (s *ScanService) CreateScan(serviceAccountID string, scope string, actor st
 			TargetType: "scan",
 			TargetID:   scanID,
 			Result:     "success",
-			Metadata: map[string]string{
+			Metadata: map[string]any{
+				"scanId":           scanID,
 				"serviceAccountId": serviceAccountID,
 				"scope":            scope,
 			},
@@ -193,6 +222,62 @@ func (s *ScanService) BuildInventoryNow(ctx context.Context, serviceAccountID st
 	return applyProjectStaleness(projects, false), scanErrors, nil
 }
 
+func (s *ScanService) ListScans(filters ScanListFilters) (ScanListResponse, error) {
+	response := ScanListResponse{
+		Items: make([]ScanListItem, 0),
+	}
+
+	if s.repo == nil {
+		return response, nil
+	}
+
+	cursorCreatedAt, cursorID, err := decodeCursor(filters.Cursor)
+	if err != nil {
+		return response, err
+	}
+
+	limit := normalizeScanLimit(filters.Limit)
+	jobs, err := s.repo.ListScanJobsFiltered(repository.ScanJobListFilter{
+		ServiceAccountID: filters.ServiceAccountID,
+		Status:           string(filters.Status),
+		From:             filters.From,
+		To:               filters.To,
+		CursorCreatedAt:  cursorCreatedAt,
+		CursorID:         cursorID,
+		Limit:            limit + 1,
+	})
+	if err != nil {
+		return response, err
+	}
+
+	if len(jobs) > limit {
+		last := jobs[limit-1]
+		response.NextCursor = encodeCursor(last.CreatedAt, last.ID)
+		jobs = jobs[:limit]
+	}
+
+	response.Items = make([]ScanListItem, 0, len(jobs))
+	for _, job := range jobs {
+		item := ScanListItem{
+			ScanID:            job.ID,
+			ServiceAccountID:  job.ServiceAccountID,
+			Actor:             job.Actor,
+			Status:            ScanStatus(job.Status),
+			CreatedAt:         job.CreatedAt.UTC().Format(time.RFC3339),
+			CompletedAt:       "",
+			TotalProjects:     job.TotalProjects,
+			CompletedProjects: job.CompletedProjects,
+			ErrorCount:        countScanErrors(job.ErrorsJSON),
+		}
+		if job.CompletedAt != nil {
+			item.CompletedAt = job.CompletedAt.UTC().Format(time.RFC3339)
+		}
+		response.Items = append(response.Items, item)
+	}
+
+	return response, nil
+}
+
 func (s *ScanService) worker() {
 	for scanID := range s.queue {
 		s.runScan(scanID)
@@ -205,7 +290,8 @@ func (s *ScanService) runScan(scanID string) {
 		return
 	}
 
-	startedAt := time.Now().UTC().Format(time.RFC3339)
+	startedAtTime := time.Now().UTC()
+	startedAt := startedAtTime.Format(time.RFC3339)
 	s.updateRecord(scanID, func(r *ScanRecord) {
 		r.Status = ScanStatusRunning
 		r.StartedAt = startedAt
@@ -220,7 +306,8 @@ func (s *ScanService) runScan(scanID string) {
 		TargetType: "scan",
 		TargetID:   scanID,
 		Result:     "success",
-		Metadata: map[string]string{
+		Metadata: map[string]any{
+			"scanId":           scanID,
 			"serviceAccountId": record.ServiceAccountID,
 		},
 	})
@@ -251,6 +338,7 @@ func (s *ScanService) runScan(scanID string) {
 
 	completedAtTime := time.Now().UTC()
 	completedAt := completedAtTime.Format(time.RFC3339)
+	durationMs := completedAtTime.Sub(startedAtTime).Milliseconds()
 
 	finalErrors := projectErrors
 	finalStatus := ScanStatusSuccess
@@ -295,8 +383,12 @@ func (s *ScanService) runScan(scanID string) {
 			TargetID:     scanID,
 			Result:       "failed",
 			ErrorSummary: err.Error(),
-			Metadata: map[string]string{
+			Metadata: map[string]any{
+				"scanId":           scanID,
 				"serviceAccountId": record.ServiceAccountID,
+				"projects":         len(finalProjects),
+				"errors":           len(finalErrors),
+				"durationMs":       durationMs,
 			},
 		})
 		return
@@ -308,10 +400,12 @@ func (s *ScanService) runScan(scanID string) {
 		TargetType: "scan",
 		TargetID:   scanID,
 		Result:     string(finalStatus),
-		Metadata: map[string]string{
+		Metadata: map[string]any{
+			"scanId":           scanID,
 			"serviceAccountId": record.ServiceAccountID,
-			"projects":         fmt.Sprintf("%d", len(finalProjects)),
-			"errors":           fmt.Sprintf("%d", len(finalErrors)),
+			"projects":         len(finalProjects),
+			"errors":           len(finalErrors),
+			"durationMs":       durationMs,
 		},
 	})
 }
@@ -528,4 +622,25 @@ func scanModelToRecord(model models.ScanJob) *ScanRecord {
 		record.CompletedAt = model.CompletedAt.UTC().Format(time.RFC3339)
 	}
 	return record
+}
+
+func normalizeScanLimit(limit int) int {
+	if limit <= 0 {
+		return defaultScanListLimit
+	}
+	if limit > maxScanListLimit {
+		return maxScanListLimit
+	}
+	return limit
+}
+
+func countScanErrors(raw string) int {
+	if raw == "" {
+		return 0
+	}
+	parsed := make([]ProjectScanError, 0)
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return 0
+	}
+	return len(parsed)
 }

@@ -1,6 +1,7 @@
 # Development Guide / 開發指南
 
 > Backend default: Go only. Node backend is compatibility fallback and feature-frozen.
+> Node fallback is manual-only via `npm run legacy:backend:node` and will be removed next release cycle.
 
 ## Project Structure / 專案結構
 
@@ -26,6 +27,9 @@ npm run dev:backend
 
 # Start both
 npm run dev
+
+# Legacy fallback only (manual)
+npm run legacy:backend:node
 ```
 
 ### Option 2: Individual Workspace / 個別工作區

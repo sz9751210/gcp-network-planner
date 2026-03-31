@@ -60,12 +60,15 @@ func TestSmokeServiceAccountScanInventory(t *testing.T) {
 	credentialHandler := NewCredentialHandler(credentialService, auditService)
 	scanService := services.NewScanService(&smokeInventoryBuilder{}, repo, auditService)
 	gcpHandler := NewGcpHandler(nil, scanService)
+	operationsHandler := NewOperationsHandler(scanService, auditService)
 
 	e := echo.New()
 	e.POST("/api/credentials", credentialHandler.CreateServiceAccount)
 	e.POST("/api/v1/scans", gcpHandler.CreateScan)
+	e.GET("/api/v1/scans", operationsHandler.ListScans)
 	e.GET("/api/v1/scans/:scanId", gcpHandler.GetScan)
 	e.GET("/api/v1/inventory", gcpHandler.GetInventory)
+	e.GET("/api/v1/audit-events", operationsHandler.ListAuditEvents)
 
 	createPayload := map[string]any{
 		"name": "smoke-sa",
@@ -144,6 +147,46 @@ func TestSmokeServiceAccountScanInventory(t *testing.T) {
 	}
 	if len(projects) == 0 {
 		t.Fatalf("expected non-empty inventory")
+	}
+
+	scanListRec := performJSONRequest(t, e, http.MethodGet, "/api/v1/scans?serviceAccountId="+serviceAccountID+"&limit=5", nil, nil)
+	if scanListRec.Code != http.StatusOK {
+		t.Fatalf("unexpected scan list status: %d body=%s", scanListRec.Code, scanListRec.Body.String())
+	}
+	var scanList map[string]any
+	if err := json.Unmarshal(scanListRec.Body.Bytes(), &scanList); err != nil {
+		t.Fatalf("failed to decode scan list response: %v", err)
+	}
+	scanItems, ok := scanList["items"].([]any)
+	if !ok || len(scanItems) == 0 {
+		t.Fatalf("expected non-empty scan items")
+	}
+	firstScanItem, ok := scanItems[0].(map[string]any)
+	if !ok {
+		t.Fatalf("invalid scan item payload")
+	}
+	if firstID, _ := firstScanItem["scanId"].(string); firstID != scanID {
+		t.Fatalf("expected scan list to include %s, got %s", scanID, firstID)
+	}
+
+	auditListRec := performJSONRequest(t, e, http.MethodGet, "/api/v1/audit-events?scanId="+scanID+"&limit=10", nil, nil)
+	if auditListRec.Code != http.StatusOK {
+		t.Fatalf("unexpected audit list status: %d body=%s", auditListRec.Code, auditListRec.Body.String())
+	}
+	var auditList map[string]any
+	if err := json.Unmarshal(auditListRec.Body.Bytes(), &auditList); err != nil {
+		t.Fatalf("failed to decode audit list response: %v", err)
+	}
+	auditItems, ok := auditList["items"].([]any)
+	if !ok || len(auditItems) == 0 {
+		t.Fatalf("expected non-empty audit items")
+	}
+	firstAudit, ok := auditItems[0].(map[string]any)
+	if !ok {
+		t.Fatalf("invalid audit item payload")
+	}
+	if targetID, _ := firstAudit["targetId"].(string); targetID != scanID {
+		t.Fatalf("expected audit targetId %s, got %s", scanID, targetID)
 	}
 }
 

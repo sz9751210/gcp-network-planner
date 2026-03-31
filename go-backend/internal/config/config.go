@@ -7,11 +7,11 @@ import (
 )
 
 type Config struct {
-	Port           string
-	Environment    string
-	DatabaseURL    string
-	EncryptionKey  string
-	CORSOrigins    []string
+	Port          string
+	Environment   string
+	DatabaseURL   string
+	EncryptionKey string
+	CORSOrigins   []string
 }
 
 func Load() (*Config, error) {

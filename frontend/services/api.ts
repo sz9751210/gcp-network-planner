@@ -37,6 +37,62 @@ export interface ScanRecord {
   errors: ScanError[];
 }
 
+export interface ScanListItem {
+  scanId: string;
+  serviceAccountId: string;
+  actor: string;
+  status: ScanStatus;
+  createdAt: string;
+  completedAt?: string;
+  totalProjects: number;
+  completedProjects: number;
+  errorCount: number;
+}
+
+export interface ScanListResponse {
+  items: ScanListItem[];
+  nextCursor?: string;
+}
+
+export interface AuditEventRecord {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  result: string;
+  errorSummary?: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AuditEventListResponse {
+  items: AuditEventRecord[];
+  nextCursor?: string;
+}
+
+export interface ListScansParams {
+  serviceAccountId?: string;
+  status?: ScanStatus;
+  from?: string;
+  to?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface ListAuditEventsParams {
+  from?: string;
+  to?: string;
+  action?: string;
+  result?: string;
+  targetType?: string;
+  targetId?: string;
+  actor?: string;
+  scanId?: string;
+  limit?: number;
+  cursor?: string;
+}
+
 export interface ServiceAccount {
   id: string;
   name: string;
@@ -379,6 +435,66 @@ function normalizeScanRecord(payload: unknown): ScanRecord {
   };
 }
 
+function normalizeScanListResponse(payload: unknown): ScanListResponse {
+  const record = isRecord(payload) ? payload : {};
+
+  const items = toArrayValue(record.items).map((item) => {
+    const itemRecord = isRecord(item) ? item : {};
+    return {
+      scanId: toStringValue(itemRecord.scanId),
+      serviceAccountId: toStringValue(itemRecord.serviceAccountId),
+      actor: toStringValue(itemRecord.actor),
+      status: toStringValue(itemRecord.status) as ScanStatus,
+      createdAt: toStringValue(itemRecord.createdAt),
+      completedAt: toStringValue(itemRecord.completedAt) || undefined,
+      totalProjects: toNumberValue(itemRecord.totalProjects),
+      completedProjects: toNumberValue(itemRecord.completedProjects),
+      errorCount: toNumberValue(itemRecord.errorCount),
+    };
+  });
+
+  return {
+    items,
+    nextCursor: toStringValue(record.nextCursor) || undefined,
+  };
+}
+
+function normalizeAuditEventListResponse(payload: unknown): AuditEventListResponse {
+  const record = isRecord(payload) ? payload : {};
+  const items = toArrayValue(record.items).map((item) => {
+    const itemRecord = isRecord(item) ? item : {};
+    const metadata = isRecord(itemRecord.metadata) ? (itemRecord.metadata as Record<string, unknown>) : {};
+
+    return {
+      id: toStringValue(itemRecord.id),
+      timestamp: toStringValue(itemRecord.timestamp),
+      actor: toStringValue(itemRecord.actor),
+      action: toStringValue(itemRecord.action),
+      targetType: toStringValue(itemRecord.targetType),
+      targetId: toStringValue(itemRecord.targetId),
+      result: toStringValue(itemRecord.result),
+      errorSummary: toStringValue(itemRecord.errorSummary) || undefined,
+      metadata,
+    };
+  });
+
+  return {
+    items,
+    nextCursor: toStringValue(record.nextCursor) || undefined,
+  };
+}
+
+function toQueryString(params: Record<string, string | number | undefined>): string {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === '') {
+      return;
+    }
+    query.set(key, String(value));
+  });
+  return query.toString();
+}
+
 export async function fetchServiceAccounts(): Promise<ServiceAccount[]> {
   const response = await fetch(`${API_BASE_URL}/api/credentials`);
 
@@ -471,6 +587,48 @@ export async function fetchScan(scanId: string): Promise<ScanRecord> {
   }
 
   return normalizeScanRecord(await response.json());
+}
+
+export async function fetchScans(params: ListScansParams = {}): Promise<ScanListResponse> {
+  const query = toQueryString({
+    serviceAccountId: params.serviceAccountId,
+    status: params.status,
+    from: params.from,
+    to: params.to,
+    limit: params.limit,
+    cursor: params.cursor,
+  });
+  const response = await fetch(`${API_BASE_URL}/api/v1/scans${query ? `?${query}` : ''}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch scans');
+  }
+
+  return normalizeScanListResponse(await response.json());
+}
+
+export async function fetchAuditEvents(params: ListAuditEventsParams = {}): Promise<AuditEventListResponse> {
+  const query = toQueryString({
+    from: params.from,
+    to: params.to,
+    action: params.action,
+    result: params.result,
+    targetType: params.targetType,
+    targetId: params.targetId,
+    actor: params.actor,
+    scanId: params.scanId,
+    limit: params.limit,
+    cursor: params.cursor,
+  });
+  const response = await fetch(`${API_BASE_URL}/api/v1/audit-events${query ? `?${query}` : ''}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch audit events');
+  }
+
+  return normalizeAuditEventListResponse(await response.json());
 }
 
 export async function fetchInventory(serviceAccountId: string): Promise<GcpProject[]> {

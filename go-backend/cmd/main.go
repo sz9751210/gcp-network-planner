@@ -48,10 +48,13 @@ func main() {
 	gcpDataService := services.NewGcpDataService(credentialService)
 	auditService := services.NewAuditService(repo)
 	scanService := services.NewScanService(gcpDataService, repo, auditService)
+	retentionCtx, retentionCancel := context.WithCancel(context.Background())
+	auditService.StartRetentionWorker(retentionCtx, 6*time.Hour)
 
 	// Initialize handlers
 	credentialHandler := handlers.NewCredentialHandler(credentialService, auditService)
 	gcpHandler := handlers.NewGcpHandler(gcpDataService, scanService)
+	operationsHandler := handlers.NewOperationsHandler(scanService, auditService)
 
 	// Initialize Echo
 	e := echo.New()
@@ -89,14 +92,18 @@ func main() {
 	api.GET("/gcp/:projectId/firewalls", gcpHandler.GetFirewallRules)
 	api.GET("/gcp/:projectId/instances", gcpHandler.GetInstances)
 	api.POST("/v1/scans", gcpHandler.CreateScan)
+	api.GET("/v1/scans", operationsHandler.ListScans)
 	api.GET("/v1/scans/:scanId", gcpHandler.GetScan)
 	api.GET("/v1/inventory", gcpHandler.GetInventory)
+	api.GET("/v1/audit-events", operationsHandler.ListAuditEvents)
 
 	// Graceful shutdown
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
+
+		retentionCancel()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
