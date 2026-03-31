@@ -233,6 +233,31 @@ export interface CidrConflict {
   }[];
 }
 
+export interface CidrInventoryRow {
+  projectId: string;
+  projectName: string;
+  vpcName: string;
+  subnetName: string;
+  region: string;
+  cidr: string;
+  totalIps: number;
+  stale: boolean;
+  lastScannedAt: string;
+}
+
+export interface CidrConflictResult {
+  inputCidr: string;
+  hasConflict: boolean;
+  conflicts: CidrInventoryRow[];
+}
+
+export interface CidrSuggestion {
+  prefix: number;
+  candidateCidr: string;
+  reason: string;
+  confidence?: number;
+}
+
 // Backend reference types (mocking the Node.js library types)
 export interface ComputeNetwork {
   name: string;

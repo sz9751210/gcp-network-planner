@@ -37,6 +37,17 @@ Owner: Platform Team
 | Operations frontend view | Completed | Added Scan History + Audit Trail with filter, copy, and audit-to-scan linkage. |
 | Node sunset preparation | Completed | Root/frontend scripts now Go-first by default; Node kept as legacy manual path. |
 
+## Phase 3.1 CIDR Manager Progress
+
+| Item | Status | Notes |
+|---|---|---|
+| CIDR Manager unified tab | Completed | Added single consolidated page for inventory/conflict/planning workflows. |
+| Legacy CIDR pages compatibility | Completed | `CIDR Planner` and `IP Allocations` converted to thin wrappers with redirect hint. |
+| All-project subnet CIDR inventory | Completed | Aggregates canonical `GcpProject.vpcs[].subnets[].ipCidrRange` only. |
+| Planning assistant (local algorithm) | Completed | Added next available RFC1918 CIDR suggestion by target prefix. |
+| Scan/freshness integration | Completed | Reuses existing scan job flow and shows stale/scan traceability context. |
+| CIDR manager test baseline | Completed | Added frontend regression + utility edge-case tests. |
+
 ## Change Log
 
 ### 2026-03-31
@@ -49,3 +60,4 @@ Owner: Platform Team
 - Added operations APIs (`/api/v1/scans`, `/api/v1/audit-events`) with cursor pagination and filters.
 - Added audit retention worker (90-day policy) and DB query indexes.
 - Added Operations page with scan/audit traceability and copy-to-clipboard utilities.
+- Added CIDR Manager tab and consolidated all-project subnet CIDR planning workflow.

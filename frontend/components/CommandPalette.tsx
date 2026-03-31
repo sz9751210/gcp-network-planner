@@ -9,7 +9,7 @@ interface Props {
 
 interface SearchResult {
   id: string;
-  type: 'Project' | 'VPC' | 'Subnet' | 'Instance' | 'Firewall' | 'LoadBalancer' | 'GKE' | 'Workload' | 'Service' | 'Storage' | 'Config';
+  type: 'Project' | 'VPC' | 'Subnet' | 'Instance' | 'Firewall' | 'LoadBalancer' | 'GKE' | 'Workload' | 'Service' | 'Storage' | 'Config' | 'Tool';
   title: string;
   subtitle: string;
   projectId: string;
@@ -52,6 +52,45 @@ export const CommandPalette: React.FC<Props> = ({ projects, onNavigate }) => {
     
     const q = query.toLowerCase();
     const hits: SearchResult[] = [];
+
+    const toolResults: Array<{ id: string; title: string; subtitle: string; view: ViewType; keywords: string[] }> = [
+      {
+        id: 'tool-cidr-manager',
+        title: 'CIDR Manager',
+        subtitle: 'Unified subnet CIDR inventory + conflict + planning',
+        view: 'cidr_manager',
+        keywords: ['cidr manager', 'cidr', 'ipam', 'subnet planning', 'allocation manager'],
+      },
+      {
+        id: 'tool-cidr-planner-legacy',
+        title: 'CIDR Planner (Legacy)',
+        subtitle: 'Legacy page redirected to CIDR Manager',
+        view: 'cidr',
+        keywords: ['cidr planner', 'legacy cidr'],
+      },
+      {
+        id: 'tool-ip-allocations-legacy',
+        title: 'IP Allocations (Legacy)',
+        subtitle: 'Legacy page redirected to CIDR Manager',
+        view: 'allocations',
+        keywords: ['ip allocations', 'allocation list', 'legacy allocations'],
+      },
+    ];
+
+    toolResults.forEach((tool) => {
+      const matches = tool.keywords.some((keyword) => keyword.includes(q) || q.includes(keyword));
+      if (!matches) {
+        return;
+      }
+      hits.push({
+        id: tool.id,
+        type: 'Tool',
+        title: tool.title,
+        subtitle: tool.subtitle,
+        projectId: '',
+        view: tool.view,
+      });
+    });
 
     projects.forEach(p => {
       // Index Project
@@ -259,6 +298,7 @@ export const CommandPalette: React.FC<Props> = ({ projects, onNavigate }) => {
                         {result.type === 'Workload' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>}
                         {result.type === 'Service' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>}
                         {(result.type === 'Storage' || result.type === 'Config') && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>}
+                        {result.type === 'Tool' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h10M7 12h10M7 17h10M4 7h.01M4 12h.01M4 17h.01" /></svg>}
                     </div>
                     <div>
                         <div className="font-medium text-sm">{result.title}</div>

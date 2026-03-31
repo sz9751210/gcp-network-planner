@@ -13,6 +13,7 @@ export type ViewType =
   | 'gke_services'
   | 'gke_storage'
   | 'gke_config'
+  | 'cidr_manager'
   | 'cidr'
   | 'allocations'
   | 'firewall'
@@ -156,13 +157,18 @@ export const Layout: React.FC<LayoutProps> = ({
       title: 'IP Management',
       items: [
         {
+          id: 'cidr_manager',
+          label: 'CIDR Manager',
+          icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h10M7 12h10M7 17h10M4 7h.01M4 12h.01M4 17h.01" /></svg>
+        },
+        {
           id: 'allocations',
-          label: 'IP Allocations',
+          label: 'IP Allocations (Legacy)',
           icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
         },
         {
           id: 'cidr',
-          label: 'CIDR Planner',
+          label: 'CIDR Planner (Legacy)',
           icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         }
       ]

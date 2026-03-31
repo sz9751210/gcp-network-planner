@@ -5,6 +5,7 @@ import { HierarchyTree } from './components/HierarchyTree';
 import { CidrPlanner } from './components/CidrPlanner';
 import { GceInventory } from './components/GceInventory';
 import { CidrAllocations } from './components/CidrAllocations';
+import { CidrManager } from './components/CidrManager';
 import { FirewallInspector } from './components/FirewallInspector';
 import { LoadBalancerInventory } from './components/LoadBalancerInventory';
 import { CloudArmorInventory } from './components/CloudArmorInventory';
@@ -128,6 +129,13 @@ function App() {
     runScanAndLoadData(accountId);
   };
 
+  const handleRescanAllProjects = async (): Promise<void> => {
+    if (!selectedServiceAccountId) {
+      return;
+    }
+    await runScanAndLoadData(selectedServiceAccountId);
+  };
+
   const handleExportClick = () => {
     setIsExportModalOpen(true);
     // 這裡可以加入匯出邏輯
@@ -149,7 +157,27 @@ function App() {
       );
       case 'topology': return <HierarchyTree projects={projects} selectedProjectId={selectedProjectId} />;
       case 'peering': return <NetworkPeeringMap projects={projects} />;
-      case 'allocations': return <CidrAllocations projects={projects} selectedProjectId={selectedProjectId} />;
+      case 'cidr_manager':
+        return (
+          <CidrManager
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            selectedServiceAccountId={selectedServiceAccountId}
+            scanStatus={scanStatus}
+            scanId={scanId}
+            scanErrors={scanErrors}
+            lastScannedAt={lastScannedAt}
+            onRescanAllProjects={handleRescanAllProjects}
+          />
+        );
+      case 'allocations':
+        return (
+          <CidrAllocations
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            onNavigateToManager={() => setCurrentView('cidr_manager')}
+          />
+        );
       case 'gce': return <GceInventory projects={projects} selectedProjectId={selectedProjectId} />;
       case 'gke_clusters': return <GkeInventory projects={projects} selectedProjectId={selectedProjectId} />;
       case 'gke_workloads': return <GkeWorkloads projects={projects} selectedProjectId={selectedProjectId} />;
@@ -159,7 +187,13 @@ function App() {
       case 'loadbalancer': return <LoadBalancerInventory projects={projects} selectedProjectId={selectedProjectId} />;
       case 'cloudarmor': return <CloudArmorInventory projects={projects} selectedProjectId={selectedProjectId} />;
       case 'firewall': return <FirewallInspector projects={projects} selectedProjectId={selectedProjectId} />;
-      case 'cidr': return <CidrPlanner projects={projects} />;
+      case 'cidr':
+        return (
+          <CidrPlanner
+            projects={projects}
+            onNavigateToManager={() => setCurrentView('cidr_manager')}
+          />
+        );
       case 'routes': return <RouteExplorer projects={projects} selectedProjectId={selectedProjectId} />;
       case 'connectivity': return <ConnectivityAnalyzer projects={projects} />;
       case 'iam': return <IamExplorer projects={projects} selectedProjectId={selectedProjectId} />;
@@ -194,13 +228,15 @@ function App() {
         ) : projects.length === 0 && !selectedServiceAccountId && currentView !== 'service_accounts' ? (
           <div className="h-full bg-slate-900 rounded-xl flex flex-col items-center justify-center text-slate-500">
             <div className="text-center p-8">
-              <h2 className="text-2xl font-bold text-white mb-4">No Service Account Selected</h2>
-              <p className="text-slate-400 mb-6">Please add a GCP service account to view your network data.</p>
+              <h2 className="text-2xl font-bold text-white mb-4">No Credentials Selected</h2>
+              <p className="text-slate-400 mb-6">
+                Connect with Application Default Credentials or a Service Account key to view your GCP network data.
+              </p>
               <button
                 onClick={() => setCurrentView('service_accounts')}
                 className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
-                Manage Service Accounts
+                Open Settings
               </button>
             </div>
           </div>

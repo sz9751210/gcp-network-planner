@@ -37,7 +37,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1IQ3BZgXgKWa0G9c_3kuTk8
 - **Compute Inventory**: Track GCE instances across projects
 - **Network Topology Analysis**: Understand connectivity and routing
 - **Encrypted Credential Storage**: AES-256-GCM encryption for service account keys
-- **CIDR Planning**: Plan IP address allocation with conflict detection
+- **CIDR Manager (All Projects)**: Unified subnet CIDR inventory, conflict analysis, and range planning
 - **GKE Management**: View clusters, workloads, and services
 - **Load Balancer & Cloud Armor**: Inventory of network services
 
@@ -48,7 +48,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1IQ3BZgXgKWa0G9c_3kuTk8
 - **運算實例清單**：追蹤專案中的 GCE 實例
 - **網路拓撲分析**：了解連線和路由
 - **加密憑證儲存**：使用 AES-256-GCM 加密服務帳號金鑰
-- **CIDR 規劃**：規劃 IP 位址配置並偵測衝突
+- **CIDR Manager（跨專案）**：整合子網 CIDR 清單、衝突分析與網段規劃
 - **GKE 管理**：查看叢集、工作負載和服務
 - **負載平衡器與 Cloud Armor**：網路服務清單
 

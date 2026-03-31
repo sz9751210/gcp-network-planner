@@ -28,6 +28,8 @@
 - Frontend Regression:
   - command palette search + navigation
   - operations view render + audit-to-scan linkage
+  - CIDR manager inventory/conflict/planning workflow
+  - legacy CIDR wrappers navigate to CIDR manager
   - GCE detail modal open path
   - firewall group expand
   - cloud armor policy expand

@@ -8,6 +8,7 @@
 
 ## Runtime Components
 - Frontend (React + Vite): expert-first dense UI, scan status + error traceability + inventory exploration.
+- CIDR Manager: consolidated subnet CIDR inventory + conflict analyzer + planning assistant across loaded projects.
 - Go API:
   - Credentials: create/list/delete/test.
   - Scan engine: async queue, status machine (`queued/running/partial/success/failed`).

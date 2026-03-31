@@ -54,6 +54,7 @@ The frontend is a React application built with Vite.
 
 - `App.tsx` - Main application component
 - `components/` - Reusable React components
+- `components/CidrManager.tsx` - Unified CIDR management entrypoint
 - `services/` - API integration and data fetching
 - `utils/` - Utility functions (CIDR parsing, etc.)
 - `types.ts` - TypeScript type definitions
