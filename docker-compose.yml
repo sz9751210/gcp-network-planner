@@ -32,11 +32,13 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - DATABASE_URL=file:./dev.db
+      - DATABASE_URL=file:/app/data/dev.db
       - ENCRYPTION_KEY=936f2425316f73a12b9870492aef6733b9504147ef113a902065a59de4b0e946
       - CORS_ORIGINS=${FRONTEND_URL:-http://localhost:3000}
+      - GOOGLE_APPLICATION_CREDENTIALS=/home/appuser/.config/gcloud/application_default_credentials.json
     volumes:
-      - go_backend_data:/app
+      - go_backend_data:/app/data
+      - ~/.config/gcloud:/home/appuser/.config/gcloud:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]

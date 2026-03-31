@@ -9,9 +9,17 @@ import (
 	"github.com/code-yeongyu/gcp-network-planner/go-backend/internal/models"
 	"github.com/code-yeongyu/gcp-network-planner/go-backend/internal/repository"
 	"github.com/code-yeongyu/gcp-network-planner/go-backend/internal/utils"
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v3"
 	"google.golang.org/api/option"
 )
+
+// ADCCredentialID is the special sentinel ID used to represent
+// Application Default Credentials (ADC). When this ID is used,
+// the backend will not look up a service account key in the
+// database; instead it will let the Google SDK automatically
+// resolve credentials via ADC (gcloud auth application-default
+// login, GOOGLE_APPLICATION_CREDENTIALS env var, etc.).
+const ADCCredentialID = "__adc__"
 
 type ServiceAccountKey struct {
 	Type                    string `json:"type"`
@@ -101,7 +109,13 @@ func (s *CredentialService) GetDecryptedCredentials(id string) (*ServiceAccountK
 	return &key, nil
 }
 
+// GetGoogleCredentials returns the raw service account JSON bytes suitable
+// for option.WithCredentialsJSON. Returns nil, nil for ADC (sentinel ID).
 func (s *CredentialService) GetGoogleCredentials(id string) ([]byte, error) {
+	if id == ADCCredentialID {
+		return nil, nil
+	}
+
 	key, err := s.GetDecryptedCredentials(id)
 	if err != nil {
 		return nil, err
@@ -132,17 +146,28 @@ func (s *CredentialService) DeleteServiceAccount(id string) error {
 }
 
 func (s *CredentialService) TestConnection(id string) (bool, string, error) {
-	credsJSON, err := s.GetGoogleCredentials(id)
-	if err != nil {
-		return false, "", err
+	var opts []option.ClientOption
+
+	if id == ADCCredentialID {
+		// Use Application Default Credentials — no explicit key needed.
+	} else {
+		credsJSON, err := s.GetGoogleCredentials(id)
+		if err != nil {
+			return false, "", err
+		}
+		opts = append(opts, option.WithCredentialsJSON(credsJSON))
 	}
 
-	service, err := cloudresourcemanager.NewService(context.Background(), option.WithCredentialsJSON(credsJSON))
+	service, err := cloudresourcemanager.NewService(context.Background(), opts...)
 	if err != nil {
-		return false, fmt.Sprintf("Failed to client: %v", err), nil
+		return false, fmt.Sprintf("Failed to create client: %v", err), nil
 	}
 
-	_, err = service.Projects.List().Filter("state:ACTIVE").Do()
+	// Use Search() with v3 API
+	req := service.Projects.Search()
+	// Only fetch one page to test connection
+	req.PageSize(1)
+	_, err = req.Do()
 	if err != nil {
 		return false, fmt.Sprintf("API Call Failed: %v", err), nil
 	}

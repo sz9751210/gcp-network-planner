@@ -205,3 +205,20 @@ func (h *CredentialHandler) TestConnection(c echo.Context) error {
 		"message": msg,
 	})
 }
+
+// GetADCStatus tests whether Application Default Credentials are available
+// on the server and returns the active identity if so.
+func (h *CredentialHandler) GetADCStatus(c echo.Context) error {
+	success, msg, err := h.credentialService.TestConnection(services.ADCCredentialID)
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"available": false,
+			"message":   err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"available": success,
+		"message":   msg,
+	})
+}

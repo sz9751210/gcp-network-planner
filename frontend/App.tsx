@@ -6,6 +6,7 @@ import { CidrPlanner } from './components/CidrPlanner';
 import { GceInventory } from './components/GceInventory';
 import { CidrAllocations } from './components/CidrAllocations';
 import { CidrManager } from './components/CidrManager';
+import { IpUsageExplorer } from './components/IpUsageExplorer';
 import { FirewallInspector } from './components/FirewallInspector';
 import { LoadBalancerInventory } from './components/LoadBalancerInventory';
 import { CloudArmorInventory } from './components/CloudArmorInventory';
@@ -160,6 +161,20 @@ function App() {
       case 'cidr_manager':
         return (
           <CidrManager
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            selectedServiceAccountId={selectedServiceAccountId}
+            scanStatus={scanStatus}
+            scanId={scanId}
+            scanErrors={scanErrors}
+            lastScannedAt={lastScannedAt}
+            onRescanAllProjects={handleRescanAllProjects}
+            onNavigateToIpUsageExplorer={() => setCurrentView('ip_usage_explorer')}
+          />
+        );
+      case 'ip_usage_explorer':
+        return (
+          <IpUsageExplorer
             projects={projects}
             selectedProjectId={selectedProjectId}
             selectedServiceAccountId={selectedServiceAccountId}

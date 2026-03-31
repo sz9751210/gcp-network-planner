@@ -55,6 +55,13 @@ export const CommandPalette: React.FC<Props> = ({ projects, onNavigate }) => {
 
     const toolResults: Array<{ id: string; title: string; subtitle: string; view: ViewType; keywords: string[] }> = [
       {
+        id: 'tool-ip-usage-explorer',
+        title: 'IP Usage Explorer',
+        subtitle: 'Dedicated IP lookup + resource sequence timeline',
+        view: 'ip_usage_explorer',
+        keywords: ['ip usage', 'ip explorer', 'ip search', 'external ip', 'internal ip', 'ip management'],
+      },
+      {
         id: 'tool-cidr-manager',
         title: 'CIDR Manager',
         subtitle: 'Unified subnet CIDR inventory + conflict + planning',

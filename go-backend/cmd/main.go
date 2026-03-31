@@ -82,6 +82,7 @@ func main() {
 	api := e.Group("/api")
 	api.POST("/credentials", credentialHandler.CreateServiceAccount)
 	api.GET("/credentials", credentialHandler.ListServiceAccounts)
+	api.GET("/credentials/adc/status", credentialHandler.GetADCStatus)
 	api.GET("/credentials/:id", credentialHandler.GetServiceAccount)
 	api.DELETE("/credentials/:id", credentialHandler.DeleteServiceAccount)
 	api.POST("/credentials/:id/test", credentialHandler.TestConnection)

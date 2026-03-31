@@ -26,7 +26,7 @@ COPY --from=builder /app/bin/server ./bin/server
 
 COPY --from=builder /app/prisma ./prisma
 
-RUN chown -R appuser:appuser /app
+RUN mkdir -p /app/data && chown -R appuser:appuser /app
 
 USER appuser
 

@@ -4,8 +4,11 @@ import {
   createServiceAccount,
   deleteServiceAccount,
   testServiceAccount,
+  fetchADCStatus,
+  ADC_CREDENTIAL_ID,
   type ServiceAccount,
   type ServiceAccountKey,
+  type ADCStatus,
 } from '../services/api';
 
 interface TestResult {
@@ -38,11 +41,30 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
   const [uploading, setUploading] = useState(false);
   const [testResults, setTestResults] = useState<Map<string, TestResult>>(new Map());
   const [isDragging, setIsDragging] = useState(false);
+  const [adcStatus, setAdcStatus] = useState<ADCStatus | null>(null);
+  const [adcLoading, setAdcLoading] = useState(false);
+  const [adcSelected, setAdcSelected] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadServiceAccounts();
+    checkADCStatus();
+    // Check if ADC is currently selected
+    const stored = localStorage.getItem('selectedServiceAccountId');
+    setAdcSelected(stored === ADC_CREDENTIAL_ID);
   }, []);
+
+  const checkADCStatus = async () => {
+    setAdcLoading(true);
+    try {
+      const status = await fetchADCStatus();
+      setAdcStatus(status);
+    } catch {
+      setAdcStatus({ available: false, message: 'Unable to check ADC status' });
+    } finally {
+      setAdcLoading(false);
+    }
+  };
 
   const loadServiceAccounts = async () => {
     setLoading(true);
@@ -192,6 +214,11 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
     }
   };
 
+  const handleUseADC = () => {
+    setAdcSelected(true);
+    onSelectAccount(ADC_CREDENTIAL_ID);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -202,13 +229,144 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-        <h1 className="text-2xl font-bold text-white mb-2">Service Accounts</h1>
-        <p className="text-slate-400">Manage your GCP service account credentials for accessing network data.</p>
+        <h1 className="text-2xl font-bold text-white mb-2">Settings</h1>
+        <p className="text-slate-400">Configure authentication credentials for accessing your GCP network data.</p>
       </div>
 
+      {/* ── ADC Section ── */}
       <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Add Service Account</h2>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-lg font-semibold text-white">Application Default Credentials (ADC)</h2>
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            Recommended for local use
+          </span>
+        </div>
+        <p className="text-slate-400 text-sm mb-5">
+          Use the credentials already configured on this machine via{' '}
+          <code className="text-blue-400 bg-slate-900 px-1.5 py-0.5 rounded text-xs">
+            gcloud auth application-default login
+          </code>{' '}
+          or the{' '}
+          <code className="text-blue-400 bg-slate-900 px-1.5 py-0.5 rounded text-xs">
+            GOOGLE_APPLICATION_CREDENTIALS
+          </code>{' '}
+          environment variable. No key file needed.
+        </p>
+
+        <div className={`rounded-xl border p-5 transition-colors ${
+          adcStatus?.available
+            ? 'border-emerald-500/30 bg-emerald-500/5'
+            : 'border-slate-600 bg-slate-900/50'
+        }`}>
+          <div className="flex items-center justify-between gap-4">
+            {/* Status indicator */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                adcLoading
+                  ? 'bg-slate-700'
+                  : adcStatus?.available
+                    ? 'bg-emerald-500/15'
+                    : 'bg-slate-700'
+              }`}>
+                {adcLoading ? (
+                  <div className="w-5 h-5 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+                ) : adcStatus?.available ? (
+                  <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-medium ${
+                    adcStatus?.available ? 'text-emerald-400' : 'text-slate-400'
+                  }`}>
+                    {adcLoading ? 'Checking...' : adcStatus?.available ? 'Available' : 'Not available'}
+                  </span>
+                  {adcSelected && adcStatus?.available && (
+                    <span className="text-xs px-1.5 py-0.5 bg-blue-500/15 text-blue-400 border border-blue-500/20 rounded-full">
+                      In use
+                    </span>
+                  )}
+                </div>
+                {adcStatus && (
+                  <p className="text-xs text-slate-500 mt-0.5 truncate">{adcStatus.message}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={checkADCStatus}
+                disabled={adcLoading}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                title="Refresh ADC status"
+              >
+                <svg className={`w-4 h-4 ${adcLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <button
+                onClick={handleUseADC}
+                disabled={!adcStatus?.available || adcLoading}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  adcStatus?.available && !adcLoading
+                    ? adcSelected
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                {adcSelected ? '✓ Using This' : 'Use This'}
+              </button>
+            </div>
+          </div>
+
+          {!adcStatus?.available && !adcLoading && (
+            <div className="mt-4 pt-4 border-t border-slate-700">
+              <p className="text-xs text-slate-500 mb-2">To enable ADC, run one of the following:</p>
+              <div className="space-y-1.5">
+                <code className="block text-xs text-blue-400 bg-slate-950 rounded px-3 py-2 font-mono">
+                  gcloud auth application-default login
+                </code>
+                <p className="text-xs text-slate-600 px-1">or set the environment variable:</p>
+                <code className="block text-xs text-blue-400 bg-slate-950 rounded px-3 py-2 font-mono">
+                  export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+                </code>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Service Account Key Upload ── */}
+      <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-lg font-semibold text-white">Service Account Key</h2>
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-700 text-slate-400 border border-slate-600">
+            JSON Key File
+          </span>
+        </div>
+        <p className="text-slate-400 text-sm mb-5">
+          Upload a service account JSON key file downloaded from{' '}
+          <a
+            href="https://console.cloud.google.com/iam-admin/serviceaccounts"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline underline-offset-2"
+          >
+            GCP Console
+          </a>
+          . The key is encrypted and stored securely on the server.
+        </p>
 
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
@@ -251,17 +409,6 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
           >
             {uploading ? 'Uploading...' : 'Select JSON File'}
           </button>
-          <p className="text-xs text-slate-500 mt-3">
-            Service account JSON files can be downloaded from{' '}
-            <a
-              href="https://console.cloud.google.com/iam-admin/serviceaccounts"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300"
-            >
-              GCP Console
-            </a>
-          </p>
         </div>
 
         {uploadError && (
@@ -277,8 +424,9 @@ export const ServiceAccounts: React.FC<ServiceAccountsProps> = ({ onSelectAccoun
         )}
       </div>
 
+      {/* ── Existing Service Accounts ── */}
       <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Existing Service Accounts</h2>
+        <h2 className="text-lg font-semibold text-white mb-4">Saved Service Accounts</h2>
 
         {loading ? (
           <div className="flex items-center justify-center py-8">

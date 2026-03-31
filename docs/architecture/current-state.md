@@ -9,6 +9,8 @@
 ## Runtime Components
 - Frontend (React + Vite): expert-first dense UI, scan status + error traceability + inventory exploration.
 - CIDR Manager: consolidated subnet CIDR inventory + conflict analyzer + planning assistant across loaded projects.
+- IP Usage Explorer (standalone page): IPv4 lookup over canonical inventory with staged sequence view (`NETWORK -> ENDPOINT -> POLICY`) and scope mode (`current/all-projects`).
+- IP Catalog tabs (inside IP Usage Explorer): external-first default tab with internal/external endpoint IP lists, quick-select search, and usage aggregation (`IP + project`).
 - Go API:
   - Credentials: create/list/delete/test.
   - Scan engine: async queue, status machine (`queued/running/partial/success/failed`).
@@ -28,6 +30,9 @@
 6. Final project graphs are stored and exposed via scan status and inventory endpoints.
 7. Audit events are recorded for credential and scan operations.
 8. Operations UI queries scan/audit list endpoints and links audit events back to scan details.
+9. CIDR Manager links users to standalone IP Usage Explorer when they need point-IP traceability.
+10. IP Usage Explorer derives usage matches from loaded inventory only (no extra backend call), then renders staged sequence timeline for operator traceability.
+11. IP Catalog classifier derives endpoint IP kind (`INTERNAL/EXTERNAL`) from instance fields and load-balancer type/fallback RFC1918 checks, then drives tabbed list UX.
 
 ## Reliability Policies
 - Scan concurrency default: `4`.

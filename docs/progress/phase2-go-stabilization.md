@@ -48,6 +48,37 @@ Owner: Platform Team
 | Scan/freshness integration | Completed | Reuses existing scan job flow and shows stale/scan traceability context. |
 | CIDR manager test baseline | Completed | Added frontend regression + utility edge-case tests. |
 
+## Phase 3.2 IP Usage Explorer Progress
+
+| Item | Status | Notes |
+|---|---|---|
+| IPv4 usage matcher utility | Completed | Added strict IPv4 validator + stage-based matcher (`NETWORK/ENDPOINT/POLICY`) over canonical inventory. |
+| Core resource coverage | Completed | Included subnet CIDR, GCE internal/external IP, LB IP, route destRange, firewall sourceRanges, Cloud Armor srcIpRanges. |
+| CIDR Manager integration | Completed | Added IP search box, scope mode (follow current/all-projects), and read-only usage analysis flow. |
+| Layered sequence timeline | Completed | Added ordered stage timeline: Network containment -> Endpoint ownership -> Policy references. |
+| Freshness/partial trust hint | Completed | Preserves partial/stale warning semantics for IP usage results. |
+| Regression + unit coverage | Completed | Added `ipUsage` utility tests and CIDR manager component timeline/scope/validation tests. |
+
+## Phase 3.2A IP Catalog Tabbing Progress
+
+| Item | Status | Notes |
+|---|---|---|
+| Internal/External IP list tabs | Completed | Added tabbed catalog split by `INTERNAL` / `EXTERNAL` in IP Usage Explorer. |
+| External IP search support | Completed | External IPv4 is now first-class in manual search and list-driven quick search. |
+| Catalog aggregation (`IP + project`) | Completed | Dedupe by key and expose `usageCount` + `resources` summary. |
+| Endpoint `ipKind` semantics | Completed | Endpoint matches now include `ipKind` metadata and UI badge rendering. |
+| Cross-tab mismatch hint | Completed | Non-blocking hint when searched IP kind differs from active tab. |
+
+## Phase 3.3 IA Noise Reduction Progress
+
+| Item | Status | Notes |
+|---|---|---|
+| Dedicated `IP Usage Explorer` page | Completed | Added standalone sidebar route to separate IP search workflow from CIDR planning workflow. |
+| CIDR Manager responsibility split | Completed | CIDR Manager now focuses on inventory/conflict/planning and keeps a single entry card for IP usage navigation. |
+| External-first behavior | Completed | New page defaults to `External IPs` tab on every open without restoring prior tab/filter state. |
+| Navigation and discoverability | Completed | Added sidebar + Command Palette navigation for `IP Usage Explorer`. |
+| Regression alignment | Completed | Split component tests: CIDR Manager validates entry-card routing; IP usage behavior validated in dedicated page tests. |
+
 ## Change Log
 
 ### 2026-03-31
@@ -61,3 +92,6 @@ Owner: Platform Team
 - Added audit retention worker (90-day policy) and DB query indexes.
 - Added Operations page with scan/audit traceability and copy-to-clipboard utilities.
 - Added CIDR Manager tab and consolidated all-project subnet CIDR planning workflow.
+- Added IP Usage Explorer in CIDR Manager with IPv4 search, all-project/current-scope analysis, and staged resource sequence timeline.
+- Added Internal/External IP catalog tabs with quick-pick search flow and endpoint IP-kind visibility.
+- Split IP Usage Explorer into a dedicated page and kept CIDR Manager as streamlined planning surface with an explicit navigation entry card.

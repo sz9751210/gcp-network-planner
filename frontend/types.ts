@@ -258,6 +258,47 @@ export interface CidrSuggestion {
   confidence?: number;
 }
 
+export type IpAddressKind = 'INTERNAL' | 'EXTERNAL';
+export type IpUsageStage = 'NETWORK' | 'ENDPOINT' | 'POLICY';
+export type IpUsageRelation = 'EXACT' | 'CIDR_CONTAINS' | 'RULE_REFERENCE';
+
+export interface IpUsageMetadata extends Record<string, string | number | boolean | undefined> {
+  ipKind?: IpAddressKind;
+}
+
+export interface IpUsageMatch {
+  id: string;
+  stage: IpUsageStage;
+  relation: IpUsageRelation;
+  resourceType: string;
+  projectId: string;
+  resourceName: string;
+  matchedField: string;
+  matchedValue: string;
+  metadata: IpUsageMetadata;
+}
+
+export interface IpUsageResult {
+  inputIp: string;
+  scope: string;
+  totals: {
+    totalMatches: number;
+    projectCount: number;
+    networkCount: number;
+    endpointCount: number;
+    policyCount: number;
+  };
+  itemsByStage: Record<IpUsageStage, IpUsageMatch[]>;
+}
+
+export interface IpCatalogItem {
+  ip: string;
+  kind: IpAddressKind;
+  projectId: string;
+  usageCount: number;
+  resources: string[];
+}
+
 // Backend reference types (mocking the Node.js library types)
 export interface ComputeNetwork {
   name: string;

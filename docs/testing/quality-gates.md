@@ -27,13 +27,20 @@
   - operations linkage: scan list + audit list traceable to scanId
 - Frontend Regression:
   - command palette search + navigation
+  - standalone `IP Usage Explorer` page navigation from sidebar/command palette/CIDR entry card
   - operations view render + audit-to-scan linkage
   - CIDR manager inventory/conflict/planning workflow
+  - IP usage explorer (IPv4 validation + scope mode + staged timeline render)
+  - IP usage explorer internal/external tabbing + external-first default + quick-search flow + tab mismatch hint
   - legacy CIDR wrappers navigate to CIDR manager
   - GCE detail modal open path
   - firewall group expand
   - cloud armor policy expand
   - load balancer topology expand
+- Frontend Unit:
+  - `ipUsage` matcher validation (`validateIpv4`) and deterministic stage ordering (`NETWORK/ENDPOINT/POLICY`)
+  - core matcher coverage for subnet/GCE/LB/route/firewall/cloud-armor relationships
+  - `ipCatalog` classifier coverage for internal/external split and `IP + project` aggregation
 
 ## Local Run Order
 1. `npm run typecheck --workspace=frontend`

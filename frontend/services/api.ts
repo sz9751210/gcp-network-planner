@@ -12,6 +12,14 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+/**
+ * Sentinel credential ID that instructs the backend to use
+ * Application Default Credentials (ADC) instead of a stored
+ * service account key. Equivalent to running
+ * `gcloud auth application-default login` on the server host.
+ */
+export const ADC_CREDENTIAL_ID = '__adc__';
+
 type ScanStatus = 'queued' | 'running' | 'partial' | 'success' | 'failed';
 
 interface UnknownRecord {
@@ -545,6 +553,25 @@ export async function testServiceAccount(id: string): Promise<{ success: boolean
   }
 
   return response.json();
+}
+
+export interface ADCStatus {
+  available: boolean;
+  message: string;
+}
+
+export async function fetchADCStatus(): Promise<ADCStatus> {
+  const response = await fetch(`${API_BASE_URL}/api/credentials/adc/status`);
+
+  if (!response.ok) {
+    return { available: false, message: 'Failed to check ADC status' };
+  }
+
+  const data = await response.json();
+  return {
+    available: typeof data.available === 'boolean' ? data.available : false,
+    message: typeof data.message === 'string' ? data.message : '',
+  };
 }
 
 export async function fetchGcpProjects(

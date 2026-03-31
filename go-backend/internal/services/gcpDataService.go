@@ -127,29 +127,38 @@ func NewGcpDataService(credentialService *CredentialService) *GcpDataService {
 	}
 }
 
-func (s *GcpDataService) getCredentials(serviceAccountID string) ([]byte, error) {
-	return s.credentialService.GetGoogleCredentials(serviceAccountID)
+func (s *GcpDataService) getClientOptions(serviceAccountID string) ([]option.ClientOption, error) {
+	if serviceAccountID == ADCCredentialID {
+		// Empty options — Google SDK will resolve ADC automatically.
+		return []option.ClientOption{}, nil
+	}
+	credsJSON, err := s.credentialService.GetGoogleCredentials(serviceAccountID)
+	if err != nil {
+		return nil, err
+	}
+	return []option.ClientOption{option.WithCredentialsJSON(credsJSON)}, nil
 }
 
 func (s *GcpDataService) FetchProjects(ctx context.Context, serviceAccountID string) ([]GcpProjectInfo, error) {
-	credsJSON, err := s.getCredentials(serviceAccountID)
+	opts, err := s.getClientOptions(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := cloudresourcemanager.NewService(ctx, option.WithCredentialsJSON(credsJSON))
+	service, err := cloudresourcemanager.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	// Use SearchProjects (v3) instead of List (v1)
-	req := service.Projects.Search().Query("state:ACTIVE")
+	// Use SearchProjects (v3) instead of List (v1).
+	// Querying "state:ACTIVE" causes 400 Bad Request in some contexts, so filter in memory.
+	req := service.Projects.Search()
 
 	var projects []GcpProjectInfo
 
 	if err := req.Pages(ctx, func(page *cloudresourcemanager.SearchProjectsResponse) error {
 		for _, project := range page.Projects {
-			if project.ProjectId == "" {
+			if project.ProjectId == "" || project.State != "ACTIVE" {
 				continue
 			}
 			projects = append(projects, GcpProjectInfo{
@@ -167,12 +176,12 @@ func (s *GcpDataService) FetchProjects(ctx context.Context, serviceAccountID str
 }
 
 func (s *GcpDataService) FetchVpcs(ctx context.Context, serviceAccountID string, projectID string) ([]GcpVpcInfo, error) {
-	credsJSON, err := s.getCredentials(serviceAccountID)
+	opts, err := s.getClientOptions(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -196,12 +205,12 @@ func (s *GcpDataService) FetchVpcs(ctx context.Context, serviceAccountID string,
 }
 
 func (s *GcpDataService) FetchSubnets(ctx context.Context, serviceAccountID string, projectID string, vpcSelfLink string) ([]GcpSubnetInfo, error) {
-	credsJSON, err := s.getCredentials(serviceAccountID)
+	opts, err := s.getClientOptions(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -244,12 +253,12 @@ func (s *GcpDataService) FetchSubnets(ctx context.Context, serviceAccountID stri
 }
 
 func (s *GcpDataService) FetchFirewallRules(ctx context.Context, serviceAccountID string, projectID string) ([]GcpFirewallRuleInfo, error) {
-	credsJSON, err := s.getCredentials(serviceAccountID)
+	opts, err := s.getClientOptions(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -281,12 +290,12 @@ func (s *GcpDataService) FetchFirewallRules(ctx context.Context, serviceAccountI
 }
 
 func (s *GcpDataService) FetchInstances(ctx context.Context, serviceAccountID string, projectID string) ([]GcpInstanceInfo, error) {
-	credsJSON, err := s.getCredentials(serviceAccountID)
+	opts, err := s.getClientOptions(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +396,7 @@ func sliceToJSON(slice []string) string {
 }
 
 func mapToJSON(m map[string]string) string {
-	if m == nil || len(m) == 0 {
+	if len(m) == 0 {
 		return "{}"
 	}
 	// Simple JSON construction
@@ -439,12 +448,12 @@ func deniedToJSON(denied []*compute.FirewallDenied) string {
 }
 
 func (s *GcpDataService) FetchGkeClusters(ctx context.Context, serviceAccountID string, projectID string) ([]GcpGkeClusterInfo, error) {
-	credsJSON, err := s.getCredentials(serviceAccountID)
+	opts, err := s.getClientOptions(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := container.NewService(ctx, option.WithCredentialsJSON(credsJSON))
+	service, err := container.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -514,12 +523,12 @@ func (s *GcpDataService) FetchGkeClusters(ctx context.Context, serviceAccountID 
 }
 
 func (s *GcpDataService) FetchLoadBalancers(ctx context.Context, serviceAccountID string, projectID string) ([]GcpLoadBalancerInfo, error) {
-	credsJSON, err := s.getCredentials(serviceAccountID)
+	opts, err := s.getClientOptions(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -564,12 +573,12 @@ func (s *GcpDataService) FetchLoadBalancers(ctx context.Context, serviceAccountI
 }
 
 func (s *GcpDataService) FetchCloudArmorPolicies(ctx context.Context, serviceAccountID string, projectID string) ([]GcpCloudArmorPolicyInfo, error) {
-	credsJSON, err := s.getCredentials(serviceAccountID)
+	opts, err := s.getClientOptions(serviceAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	service, err := compute.NewService(ctx, option.WithCredentialsJSON(credsJSON))
+	service, err := compute.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
