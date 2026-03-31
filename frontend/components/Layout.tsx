@@ -15,6 +15,7 @@ export type ViewType =
   | 'gke_config'
   | 'cidr_manager'
   | 'ip_usage_explorer'
+  | 'ip_flow_visualizer'
   | 'cidr'
   | 'allocations'
   | 'firewall'
@@ -157,6 +158,11 @@ export const Layout: React.FC<LayoutProps> = ({
     {
       title: 'IP Management',
       items: [
+        {
+          id: 'ip_flow_visualizer',
+          label: 'IP Flow Visualizer',
+          icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /><circle cx="19" cy="5" r="3" strokeWidth={2} /></svg>
+        },
         {
           id: 'ip_usage_explorer',
           label: 'IP Usage Explorer',

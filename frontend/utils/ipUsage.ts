@@ -20,6 +20,14 @@ const ENDPOINT_RANK: Record<string, number> = {
   LOAD_BALANCER: 2,
 };
 
+export type CloudArmorMode = 'all_matches' | 'lb_attached_only';
+
+interface BuildIpUsageOptions {
+  cloudArmorMode?: CloudArmorMode;
+  includeFirewallRules?: boolean;
+  includeLbPolicyReferences?: boolean;
+}
+
 export function validateIpv4(input: string): boolean {
   const value = input.trim();
   const segments = value.split('.');
@@ -117,10 +125,17 @@ export function buildIpCatalog(
 export function buildIpUsageResult(
   projects: GcpProject[],
   scope: string,
-  inputIp: string
+  inputIp: string,
+  options?: BuildIpUsageOptions
 ): IpUsageResult {
   const normalizedIp = inputIp.trim();
   const scopedProjects = projects.filter((project) => scope === 'all' || project.projectId === scope);
+  const cloudArmorMode = options?.cloudArmorMode ?? 'all_matches';
+  const includeFirewallRules = options?.includeFirewallRules ?? true;
+  const includeLbPolicyReferences = options?.includeLbPolicyReferences ?? false;
+  const lbAttachedPoliciesByProject = cloudArmorMode === 'lb_attached_only'
+    ? buildAttachedArmorPolicyNameSet(scopedProjects)
+    : new Map<string, Set<string>>();
   const networkMatches: IpUsageMatch[] = [];
   const endpointMatches: IpUsageMatch[] = [];
   const policyMatches: IpUsageMatch[] = [];
@@ -236,35 +251,65 @@ export function buildIpUsageResult(
           ipKind,
         },
       });
+
+      if (includeLbPolicyReferences) {
+        getLoadBalancerAttachedPolicyNames(loadBalancer).forEach((policyName) => {
+          policyMatches.push({
+            id: `armor-attached-${project.projectId}-${loadBalancer.id}-${policyName}`,
+            stage: 'POLICY',
+            relation: 'RULE_REFERENCE',
+            resourceType: 'CLOUD_ARMOR',
+            projectId: project.projectId,
+            resourceName: policyName,
+            matchedField: 'securityPolicy',
+            matchedValue: policyName,
+            metadata: {
+              policyName,
+              policySource: 'LB_ATTACHED',
+              loadBalancerName: loadBalancer.name,
+              priority: -1,
+            },
+          });
+        });
+      }
     });
 
-    project.firewallRules.forEach((rule) => {
-      const sourceRanges = rule.sourceRanges || [];
-      sourceRanges.forEach((sourceRange) => {
-        if (!cidrContainsIp(sourceRange, normalizedIp)) {
-          return;
-        }
+    if (includeFirewallRules) {
+      project.firewallRules.forEach((rule) => {
+        const sourceRanges = rule.sourceRanges || [];
+        sourceRanges.forEach((sourceRange) => {
+          if (!cidrContainsIp(sourceRange, normalizedIp)) {
+            return;
+          }
 
-        policyMatches.push({
-          id: `firewall-${project.projectId}-${rule.id}-${sourceRange}`,
-          stage: 'POLICY',
-          relation: 'RULE_REFERENCE',
-          resourceType: 'FIREWALL',
-          projectId: project.projectId,
-          resourceName: rule.name,
-          matchedField: 'sourceRanges',
-          matchedValue: sourceRange,
-          metadata: {
-            network: rule.network,
-            direction: rule.direction,
-            action: rule.action,
-            priority: rule.priority,
-          },
+          policyMatches.push({
+            id: `firewall-${project.projectId}-${rule.id}-${sourceRange}`,
+            stage: 'POLICY',
+            relation: 'RULE_REFERENCE',
+            resourceType: 'FIREWALL',
+            projectId: project.projectId,
+            resourceName: rule.name,
+            matchedField: 'sourceRanges',
+            matchedValue: sourceRange,
+            metadata: {
+              network: rule.network,
+              direction: rule.direction,
+              action: rule.action,
+              priority: rule.priority,
+            },
+          });
         });
       });
-    });
+    }
 
     project.armorPolicies.forEach((policy) => {
+      if (cloudArmorMode === 'lb_attached_only') {
+        const attachedPolicies = lbAttachedPoliciesByProject.get(project.projectId);
+        if (!attachedPolicies || !attachedPolicies.has(policy.name)) {
+          return;
+        }
+      }
+
       policy.rules.forEach((rule) => {
         (rule.srcIpRanges || []).forEach((sourceRange) => {
           if (!cidrContainsIp(sourceRange, normalizedIp)) {
@@ -379,6 +424,29 @@ function inferLoadBalancerIpKind(loadBalancer: GcpLoadBalancer): IpAddressKind {
     return 'EXTERNAL';
   }
   return inferIpAddressKind(loadBalancer.ipAddress);
+}
+
+function buildAttachedArmorPolicyNameSet(projects: GcpProject[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  projects.forEach((project) => {
+    const names = new Set<string>();
+    project.loadBalancers.forEach((lb) => {
+      getLoadBalancerAttachedPolicyNames(lb).forEach((policyName) => {
+        if (policyName) {
+          names.add(policyName);
+        }
+      });
+    });
+    map.set(project.projectId, names);
+  });
+  return map;
+}
+
+function getLoadBalancerAttachedPolicyNames(loadBalancer: GcpLoadBalancer): string[] {
+  return [...new Set([
+    ...(loadBalancer.cloudArmorPolicies || []),
+    ...(loadBalancer.securityPolicy ? [loadBalancer.securityPolicy] : []),
+  ].filter((value) => value !== ''))];
 }
 
 function isPrivateIpv4(ip: string): boolean {

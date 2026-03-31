@@ -195,6 +195,36 @@ function toRecordStringMap(value: unknown): Record<string, string> {
   return result;
 }
 
+function toRecordStringArrayMap(value: unknown): Record<string, string[]> {
+  const source = typeof value === 'string' ? parseJSON(value) : value;
+  if (!isRecord(source)) {
+    return {};
+  }
+
+  const result: Record<string, string[]> = {};
+  Object.entries(source).forEach(([key, val]) => {
+    result[key] = toStringArray(val);
+  });
+  return result;
+}
+
+function toRecordBooleanMap(value: unknown): Record<string, boolean> {
+  const source = typeof value === 'string' ? parseJSON(value) : value;
+  if (!isRecord(source)) {
+    return {};
+  }
+
+  const result: Record<string, boolean> = {};
+  Object.entries(source).forEach(([key, val]) => {
+    result[key] = toBooleanValue(val);
+  });
+  return result;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value !== ''))];
+}
+
 function normalizeFirewallPorts(value: unknown): FirewallPort[] {
   const result: FirewallPort[] = [];
   toArrayValue(value).forEach((item) => {
@@ -300,11 +330,36 @@ function normalizeProject(project: unknown): GcpProject {
 
   const loadBalancers: GcpLoadBalancer[] = toArrayValue(record.loadBalancers).map((lb) => {
     const lbRecord = isRecord(lb) ? lb : {};
-    const backends = toStringArray(lbRecord.backends);
+    const backends = uniqueStrings(toStringArray(lbRecord.backends));
     const legacyBackend = toStringValue(lbRecord.backendService);
     if (backends.length === 0 && legacyBackend) {
       backends.push(legacyBackend);
     }
+    const legacySecurityPolicy = toStringValue(lbRecord.securityPolicy);
+    const cloudArmorPolicies = uniqueStrings([
+      ...toStringArray(lbRecord.cloudArmorPolicies),
+      ...(legacySecurityPolicy ? [legacySecurityPolicy] : []),
+    ]);
+    const backendSecurityPolicies = toRecordStringArrayMap(lbRecord.backendSecurityPolicies);
+    const backendSecurityPolicyUnavailable = toRecordBooleanMap(lbRecord.backendSecurityPolicyUnavailable);
+    if (Object.keys(backendSecurityPolicies).length === 0 && legacySecurityPolicy) {
+      backends.forEach((backend) => {
+        backendSecurityPolicies[backend] = [legacySecurityPolicy];
+      });
+    }
+    backends.forEach((backend) => {
+      if (!backendSecurityPolicies[backend]) {
+        backendSecurityPolicies[backend] = [];
+      } else {
+        backendSecurityPolicies[backend] = uniqueStrings(backendSecurityPolicies[backend]);
+      }
+      if (backendSecurityPolicyUnavailable[backend] === undefined) {
+        backendSecurityPolicyUnavailable[backend] = false;
+      }
+    });
+
+    const securityPolicy = cloudArmorPolicies[0] || undefined;
+
     return {
       id: toStringValue(lbRecord.id),
       name: toStringValue(lbRecord.name),
@@ -314,7 +369,10 @@ function normalizeProject(project: unknown): GcpProject {
       portRange: toStringValue(lbRecord.portRange),
       region: toStringValue(lbRecord.region) || undefined,
       backends,
-      securityPolicy: toStringValue(lbRecord.securityPolicy) || undefined,
+      securityPolicy,
+      cloudArmorPolicies,
+      backendSecurityPolicies,
+      backendSecurityPolicyUnavailable,
       forwardingRuleName: toStringValue(lbRecord.forwardingRuleName) || toStringValue(lbRecord.name),
     };
   });

@@ -313,6 +313,13 @@ export const MOCK_PROJECTS: GcpProject[] = [
         region: 'global',
         backends: ['frontend-group-abc-service'],
         securityPolicy: 'frontend-edge-protection',
+        cloudArmorPolicies: ['frontend-edge-protection'],
+        backendSecurityPolicies: {
+          'frontend-group-abc-service': ['frontend-edge-protection'],
+        },
+        backendSecurityPolicyUnavailable: {
+          'frontend-group-abc-service': false,
+        },
         forwardingRuleName: 'frontend-global-forwarding-rule'
       }
     ],
@@ -476,6 +483,13 @@ export const MOCK_PROJECTS: GcpProject[] = [
         portRange: '5432',
         region: 'europe-west1',
         backends: ['data-processing-backend'],
+        cloudArmorPolicies: [],
+        backendSecurityPolicies: {
+          'data-processing-backend': [],
+        },
+        backendSecurityPolicyUnavailable: {
+          'data-processing-backend': false,
+        },
         forwardingRuleName: 'data-internal-forwarding-rule'
       }
     ],

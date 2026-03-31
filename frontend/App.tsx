@@ -7,6 +7,7 @@ import { GceInventory } from './components/GceInventory';
 import { CidrAllocations } from './components/CidrAllocations';
 import { CidrManager } from './components/CidrManager';
 import { IpUsageExplorer } from './components/IpUsageExplorer';
+import { IpFlowVisualizer } from './components/IpFlowVisualizer';
 import { FirewallInspector } from './components/FirewallInspector';
 import { LoadBalancerInventory } from './components/LoadBalancerInventory';
 import { CloudArmorInventory } from './components/CloudArmorInventory';
@@ -175,6 +176,19 @@ function App() {
       case 'ip_usage_explorer':
         return (
           <IpUsageExplorer
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            selectedServiceAccountId={selectedServiceAccountId}
+            scanStatus={scanStatus}
+            scanId={scanId}
+            scanErrors={scanErrors}
+            lastScannedAt={lastScannedAt}
+            onRescanAllProjects={handleRescanAllProjects}
+          />
+        );
+      case 'ip_flow_visualizer':
+        return (
+          <IpFlowVisualizer
             projects={projects}
             selectedProjectId={selectedProjectId}
             selectedServiceAccountId={selectedServiceAccountId}

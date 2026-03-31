@@ -117,16 +117,19 @@ type ProjectCloudArmorPolicy struct {
 }
 
 type ProjectLoadBalancer struct {
-	ID                 string   `json:"id"`
-	Name               string   `json:"name"`
-	Type               string   `json:"type"`
-	IPAddress          string   `json:"ipAddress"`
-	Protocol           string   `json:"protocol"`
-	PortRange          string   `json:"portRange"`
-	Region             string   `json:"region,omitempty"`
-	Backends           []string `json:"backends"`
-	SecurityPolicy     string   `json:"securityPolicy,omitempty"`
-	ForwardingRuleName string   `json:"forwardingRuleName"`
+	ID                               string              `json:"id"`
+	Name                             string              `json:"name"`
+	Type                             string              `json:"type"`
+	IPAddress                        string              `json:"ipAddress"`
+	Protocol                         string              `json:"protocol"`
+	PortRange                        string              `json:"portRange"`
+	Region                           string              `json:"region,omitempty"`
+	Backends                         []string            `json:"backends"`
+	SecurityPolicy                   string              `json:"securityPolicy,omitempty"`
+	CloudArmorPolicies               []string            `json:"cloudArmorPolicies"`
+	BackendSecurityPolicies          map[string][]string `json:"backendSecurityPolicies"`
+	BackendSecurityPolicyUnavailable map[string]bool     `json:"backendSecurityPolicyUnavailable"`
+	ForwardingRuleName               string              `json:"forwardingRuleName"`
 }
 
 type ProjectIAMBindingCondition struct {
@@ -378,20 +381,67 @@ func (s *GcpDataService) BuildProjectGraph(ctx context.Context, serviceAccountID
 	}
 
 	for _, lb := range loadBalancers {
-		backends := make([]string, 0)
+		backends := append([]string(nil), lb.Backends...)
 		if strings.TrimSpace(lb.BackendService) != "" {
 			backends = append(backends, lb.BackendService)
 		}
+		backends = uniqueNonEmpty(backends)
+
+		cloudArmorPolicies := append([]string(nil), lb.CloudArmorPolicies...)
+		if strings.TrimSpace(lb.SecurityPolicy) != "" {
+			cloudArmorPolicies = append(cloudArmorPolicies, lb.SecurityPolicy)
+		}
+		cloudArmorPolicies = uniqueNonEmpty(cloudArmorPolicies)
+
+		securityPolicy := lb.SecurityPolicy
+		if strings.TrimSpace(securityPolicy) == "" && len(cloudArmorPolicies) > 0 {
+			securityPolicy = cloudArmorPolicies[0]
+		}
+
+		backendSecurityPolicies := make(map[string][]string, len(lb.BackendSecurityPolicies))
+		for backend, policies := range lb.BackendSecurityPolicies {
+			backendName := strings.TrimSpace(backend)
+			if backendName == "" {
+				continue
+			}
+			backendSecurityPolicies[backendName] = uniqueNonEmpty(append([]string(nil), policies...))
+		}
+		backendPolicyUnavailable := make(map[string]bool, len(lb.BackendSecurityPolicyUnavailable))
+		for backend, unavailable := range lb.BackendSecurityPolicyUnavailable {
+			backendName := strings.TrimSpace(backend)
+			if backendName == "" {
+				continue
+			}
+			backendPolicyUnavailable[backendName] = unavailable
+		}
+		for _, backend := range backends {
+			if _, ok := backendSecurityPolicies[backend]; !ok {
+				backendSecurityPolicies[backend] = make([]string, 0)
+			}
+			if _, ok := backendPolicyUnavailable[backend]; !ok {
+				backendPolicyUnavailable[backend] = false
+			}
+		}
+
+		forwardingRuleName := lb.ForwardingRuleName
+		if strings.TrimSpace(forwardingRuleName) == "" {
+			forwardingRuleName = lb.Name
+		}
+
 		graph.LoadBalancers = append(graph.LoadBalancers, ProjectLoadBalancer{
-			ID:                 lb.ID,
-			Name:               lb.Name,
-			Type:               normalizeLoadBalancerType(lb.Type, lb.Protocol),
-			IPAddress:          lb.IPAddress,
-			Protocol:           lb.Protocol,
-			PortRange:          lb.PortRange,
-			Region:             defaultRegion(lb.Region),
-			Backends:           backends,
-			ForwardingRuleName: lb.Name,
+			ID:                               lb.ID,
+			Name:                             lb.Name,
+			Type:                             normalizeLoadBalancerType(lb.Type, lb.Protocol),
+			IPAddress:                        lb.IPAddress,
+			Protocol:                         lb.Protocol,
+			PortRange:                        lb.PortRange,
+			Region:                           defaultRegion(lb.Region),
+			Backends:                         backends,
+			SecurityPolicy:                   securityPolicy,
+			CloudArmorPolicies:               cloudArmorPolicies,
+			BackendSecurityPolicies:          backendSecurityPolicies,
+			BackendSecurityPolicyUnavailable: backendPolicyUnavailable,
+			ForwardingRuleName:               forwardingRuleName,
 		})
 	}
 
@@ -535,4 +585,21 @@ func defaultRegion(region string) string {
 		return "global"
 	}
 	return region
+}
+
+func uniqueNonEmpty(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	unique := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		unique = append(unique, trimmed)
+	}
+	return unique
 }

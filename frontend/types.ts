@@ -103,6 +103,9 @@ export interface GcpLoadBalancer {
   region?: string; // 'global' or specific region
   backends: string[]; // Backend Service names
   securityPolicy?: string; // Name of the attached Cloud Armor policy
+  cloudArmorPolicies: string[]; // Ordered and deduplicated Cloud Armor policies attached to LB backends
+  backendSecurityPolicies: Record<string, string[]>; // backend service -> ordered Cloud Armor policies
+  backendSecurityPolicyUnavailable: Record<string, boolean>; // backend service -> policy lookup failed or permission unavailable
   forwardingRuleName: string;
 }
 

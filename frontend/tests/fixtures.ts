@@ -65,6 +65,13 @@ export const buildTestProject = (): GcpProject => ({
 			region: 'global',
 			backends: ['backend-1'],
 			securityPolicy: 'armor-1',
+			cloudArmorPolicies: ['armor-1'],
+			backendSecurityPolicies: {
+				'backend-1': ['armor-1'],
+			},
+			backendSecurityPolicyUnavailable: {
+				'backend-1': false,
+			},
 			forwardingRuleName: 'fr-1',
 		},
 	],

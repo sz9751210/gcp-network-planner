@@ -35,6 +35,62 @@ describe('ipUsage utils', () => {
     ]);
   });
 
+  it('supports lb_attached_only cloud armor mode', () => {
+    const project = buildTestProject();
+    project.loadBalancers[0].securityPolicy = 'armor-policy';
+    project.loadBalancers[0].cloudArmorPolicies = ['armor-policy'];
+    project.loadBalancers[0].backendSecurityPolicies = {
+      'backend-1': ['armor-policy'],
+    };
+    project.armorPolicies.push({
+      ...project.armorPolicies[0],
+      id: 'armor-2',
+      name: 'unattached-policy',
+    });
+
+    const defaultResult = buildIpUsageResult([project], 'all', '10.0.0.10');
+    const attachedOnlyResult = buildIpUsageResult([project], 'all', '10.0.0.10', {
+      cloudArmorMode: 'lb_attached_only',
+    });
+
+    const defaultArmor = defaultResult.itemsByStage.POLICY.filter((item) => item.resourceType === 'CLOUD_ARMOR');
+    const attachedArmor = attachedOnlyResult.itemsByStage.POLICY.filter((item) => item.resourceType === 'CLOUD_ARMOR');
+
+    expect(defaultArmor).toHaveLength(2);
+    expect(attachedArmor).toHaveLength(1);
+    expect(attachedArmor[0].metadata.policyName).toBe('armor-policy');
+  });
+
+  it('supports hiding firewall matches from policy stage', () => {
+    const project = buildTestProject();
+    const result = buildIpUsageResult([project], 'all', '10.0.0.10', {
+      includeFirewallRules: false,
+    });
+
+    expect(result.itemsByStage.POLICY.some((item) => item.resourceType === 'FIREWALL')).toBe(false);
+    expect(result.itemsByStage.POLICY.some((item) => item.resourceType === 'CLOUD_ARMOR')).toBe(true);
+  });
+
+  it('adds LB security policy references without requiring srcIpRanges match', () => {
+    const project = buildTestProject();
+    project.loadBalancers[0].securityPolicy = 'armor-policy';
+    project.loadBalancers[0].cloudArmorPolicies = ['armor-policy'];
+    project.loadBalancers[0].backendSecurityPolicies = {
+      'backend-1': ['armor-policy'],
+    };
+
+    const result = buildIpUsageResult([project], 'all', '35.1.1.1', {
+      cloudArmorMode: 'lb_attached_only',
+      includeFirewallRules: false,
+      includeLbPolicyReferences: true,
+    });
+
+    const attachedPolicyRef = result.itemsByStage.POLICY.find(
+      (item) => item.resourceType === 'CLOUD_ARMOR' && item.matchedField === 'securityPolicy'
+    );
+    expect(attachedPolicyRef?.matchedValue).toBe('armor-policy');
+  });
+
   it('orders network by project and cidr specificity, endpoint and policy by fixed rank', () => {
     const project = buildTestProject();
     project.vpcs[0].subnets.push({
