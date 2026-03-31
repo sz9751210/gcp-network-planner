@@ -137,6 +137,7 @@ const RESOURCE_TYPE_CONFIG: Record<
 const STAGE_ORDER: IpUsageStage[] = ['NETWORK', 'ENDPOINT', 'POLICY'];
 const MAX_VISIBLE_NODES = 6;
 const LB_BACKEND_PREVIEW_LIMIT = 3;
+const GCP_CONSOLE_BASE_URL = 'https://console.cloud.google.com';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,88 @@ function getLbPolicyNames(lb: GcpLoadBalancer): string[] {
     ...(lb.securityPolicy ? [lb.securityPolicy] : []),
   ]);
 }
+
+function buildSubnetConsoleUrl(projectId: string, region: string, subnetName: string): string {
+  return `${GCP_CONSOLE_BASE_URL}/networking/subnets/details/${encodeURIComponent(region)}/${encodeURIComponent(subnetName)}?project=${encodeURIComponent(projectId)}`;
+}
+
+function buildInstanceConsoleUrl(projectId: string, zone: string, instanceName: string): string {
+  return `${GCP_CONSOLE_BASE_URL}/compute/instancesDetail/zones/${encodeURIComponent(zone)}/instances/${encodeURIComponent(instanceName)}?project=${encodeURIComponent(projectId)}`;
+}
+
+function buildLoadBalancerConsoleUrl(projectId: string): string {
+  return `${GCP_CONSOLE_BASE_URL}/net-services/loadbalancing/list/loadBalancers?project=${encodeURIComponent(projectId)}`;
+}
+
+function buildCloudArmorConsoleUrl(projectId: string): string {
+  return `${GCP_CONSOLE_BASE_URL}/security/cloud-armor/policies?project=${encodeURIComponent(projectId)}`;
+}
+
+function buildFirewallConsoleUrl(projectId: string, firewallName: string): string {
+  return `${GCP_CONSOLE_BASE_URL}/networking/firewalls/details/${encodeURIComponent(firewallName)}?project=${encodeURIComponent(projectId)}`;
+}
+
+function buildRouteConsoleUrl(projectId: string): string {
+  return `${GCP_CONSOLE_BASE_URL}/networking/routes/list?project=${encodeURIComponent(projectId)}`;
+}
+
+function buildConsoleUrlForMatch(match: IpUsageMatch): string {
+  if (match.resourceType === 'SUBNET') {
+    const region = String(match.metadata.region ?? '');
+    const subnetName = String(match.metadata.subnetName ?? match.resourceName.split('/').at(-1) ?? '');
+    if (region && subnetName) {
+      return buildSubnetConsoleUrl(match.projectId, region, subnetName);
+    }
+    return `${GCP_CONSOLE_BASE_URL}/networking/subnets/list?project=${encodeURIComponent(match.projectId)}`;
+  }
+
+  if (match.resourceType === 'INSTANCE_INTERNAL_IP' || match.resourceType === 'INSTANCE_EXTERNAL_IP') {
+    const zone = String(match.metadata.zone ?? '');
+    if (zone) {
+      return buildInstanceConsoleUrl(match.projectId, zone, match.resourceName);
+    }
+    return `${GCP_CONSOLE_BASE_URL}/compute/instances?project=${encodeURIComponent(match.projectId)}`;
+  }
+
+  if (match.resourceType === 'LOAD_BALANCER') {
+    return buildLoadBalancerConsoleUrl(match.projectId);
+  }
+
+  if (match.resourceType === 'CLOUD_ARMOR') {
+    return buildCloudArmorConsoleUrl(match.projectId);
+  }
+
+  if (match.resourceType === 'FIREWALL') {
+    return buildFirewallConsoleUrl(match.projectId, match.resourceName);
+  }
+
+  if (match.resourceType === 'ROUTE') {
+    return buildRouteConsoleUrl(match.projectId);
+  }
+
+  return `${GCP_CONSOLE_BASE_URL}/home/dashboard?project=${encodeURIComponent(match.projectId)}`;
+}
+
+const ConsoleExternalLink: React.FC<{ href: string; title: string; text?: string; className?: string }> = ({
+  href,
+  title,
+  text,
+  className = '',
+}) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    title={title}
+    className={`inline-flex items-center gap-1.5 text-[11px] text-blue-300 hover:text-blue-200 transition-colors ${className}`}
+  >
+    {text && <span>{text}</span>}
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 3h7m0 0v7m0-7L10 14" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5h5M5 5a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5" />
+    </svg>
+  </a>
+);
 
 // ─── Shared UI primitives ──────────────────────────────────────────────────────
 
@@ -208,17 +291,21 @@ const DetailRow: React.FC<{ label: string; value: string; mono?: boolean; highli
 
 // ─── GCE Detail Panel ─────────────────────────────────────────────────────────
 
-const GceDetailPanel: React.FC<{ instance: GcpInstance }> = ({ instance }) => {
+const GceDetailPanel: React.FC<{ instance: GcpInstance; projectId: string }> = ({ instance, projectId }) => {
   const labelEntries = Object.entries(instance.labels ?? {});
+  const instanceConsoleUrl = buildInstanceConsoleUrl(projectId, instance.zone, instance.name);
   return (
     <div className="space-y-5">
       <section>
-        <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-          </svg>
-          GCE Instance
-        </h4>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+            </svg>
+            GCE Instance
+          </h4>
+          <ConsoleExternalLink href={instanceConsoleUrl} title="Open VM in GCP Console" text="Open" />
+        </div>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-sm font-bold text-white">{instance.name}</span>
           <InstanceStatusBadge status={instance.status} />
@@ -289,7 +376,9 @@ const ArmorActionBadge: React.FC<{ action: string; preview?: boolean }> = ({ act
   );
 };
 
-const LbDetailPanel: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[] }> = ({ lb, projects }) => {
+const LbDetailPanel: React.FC<{ lb: GcpLoadBalancer; projectId: string; projects: GcpProject[] }> = ({ lb, projectId, projects }) => {
+  const loadBalancerConsoleUrl = buildLoadBalancerConsoleUrl(projectId);
+  const cloudArmorConsoleUrl = buildCloudArmorConsoleUrl(projectId);
   const policyMap = useMemo(() => {
     const map = new Map<string, GcpCloudArmorPolicy>();
     projects.forEach((project) => {
@@ -325,13 +414,16 @@ const LbDetailPanel: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[] }> =
   return (
     <div className="space-y-6">
       <section>
-        <h4 className="text-xs font-semibold text-teal-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-          <span className="w-5 h-5 rounded-full bg-teal-900/60 border border-teal-700/40 text-[10px] font-bold text-teal-300 flex items-center justify-center">1</span>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          Load Balancer Frontend
-        </h4>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h4 className="text-xs font-semibold text-teal-400 uppercase tracking-wider flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-teal-900/60 border border-teal-700/40 text-[10px] font-bold text-teal-300 flex items-center justify-center">1</span>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Load Balancer Frontend
+          </h4>
+          <ConsoleExternalLink href={loadBalancerConsoleUrl} title="Open Load Balancer in GCP Console" text="Open" />
+        </div>
         <div className="space-y-0">
           <DetailRow label="Name" value={lb.name} highlight />
           <DetailRow label="LB ID" value={lb.id} mono />
@@ -357,6 +449,7 @@ const LbDetailPanel: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[] }> =
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-500 font-mono">#{idx + 1}</span>
                   <span className="text-xs font-mono text-slate-100 break-all">{row.backend}</span>
+                  <ConsoleExternalLink href={loadBalancerConsoleUrl} title="Open backend service in GCP Console" />
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">
                   {row.policies.length > 0
@@ -404,7 +497,10 @@ const LbDetailPanel: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[] }> =
                         <div key={`${row.backend}-${policyName}`} className="bg-slate-800/70 border border-red-900/30 rounded-lg px-3 py-2.5">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-mono text-slate-100 break-all">{policyName}</span>
-                            {displayAction && <ArmorActionBadge action={displayAction} />}
+                            <div className="flex items-center gap-2">
+                              {displayAction && <ArmorActionBadge action={displayAction} />}
+                              <ConsoleExternalLink href={cloudArmorConsoleUrl} title="Open Cloud Armor policy in GCP Console" />
+                            </div>
                           </div>
                           {policy ? (
                             <p className="text-[10px] text-slate-500 mt-1">
@@ -426,9 +522,10 @@ const LbDetailPanel: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[] }> =
                 <p className="text-xs text-slate-400">Policies detected but backend mapping unavailable</p>
                 <div className="flex flex-wrap gap-1.5">
                   {unmappedPolicies.map((policyName) => (
-                    <span key={`unmapped-${policyName}`} className="text-[10px] font-mono bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-300">
-                      {policyName}
-                    </span>
+                    <div key={`unmapped-${policyName}`} className="inline-flex items-center gap-1.5 text-[10px] font-mono bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-300">
+                      <span>{policyName}</span>
+                      <ConsoleExternalLink href={cloudArmorConsoleUrl} title="Open Cloud Armor policies in GCP Console" />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -444,8 +541,13 @@ const LbDetailPanel: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[] }> =
 
 const GenericDetailPanel: React.FC<{ match: IpUsageMatch }> = ({ match }) => {
   const metaEntries = Object.entries(match.metadata).filter(([, v]) => v !== undefined && v !== null && v !== '');
+  const consoleUrl = buildConsoleUrlForMatch(match);
   return (
     <div className="space-y-4">
+      <section className="bg-slate-800/40 border border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3">
+        <p className="text-[11px] text-slate-400">Read-only in Network Planner. Manage changes in GCP Console.</p>
+        <ConsoleExternalLink href={consoleUrl} title="Open resource in GCP Console" text="Open" />
+      </section>
       <section>
         <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Match Details</h4>
         <div className="space-y-0">
@@ -487,6 +589,7 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ detail, projects, onClose }
   const { match, stage, resolvedInstance, resolvedLb } = detail;
   const stageConfig = STAGE_CONFIG[stage];
   const typeConfig = RESOURCE_TYPE_CONFIG[match.resourceType];
+  const consoleUrl = buildConsoleUrlForMatch(match);
 
   return (
     <>
@@ -505,18 +608,21 @@ const DetailDrawer: React.FC<DetailDrawerProps> = ({ detail, projects, onClose }
                 <p className="text-[11px] text-slate-500 mt-0.5 font-mono">{match.projectId}</p>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1 rounded shrink-0">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <ConsoleExternalLink href={consoleUrl} title="Open in GCP Console" />
+              <button type="button" onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1 rounded">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Body */}
         <div className="flex-grow overflow-y-auto p-5">
-          {resolvedInstance && <GceDetailPanel instance={resolvedInstance} />}
-          {resolvedLb && <LbDetailPanel lb={resolvedLb} projects={projects} />}
+          {resolvedInstance && <GceDetailPanel instance={resolvedInstance} projectId={match.projectId} />}
+          {resolvedLb && <LbDetailPanel lb={resolvedLb} projectId={match.projectId} projects={projects} />}
           {!resolvedInstance && !resolvedLb && <GenericDetailPanel match={match} />}
         </div>
       </div>
@@ -595,8 +701,12 @@ const FlowNode: React.FC<FlowNodeProps> = ({ match, stage, isSelected, projects,
     }
     if (match.resourceType === 'SUBNET') {
       return (
-        <div className="mt-1">
-          <span className="text-[10px] font-mono text-slate-400">{match.metadata.region as string ?? ''}</span>
+        <div className="mt-1 space-y-1">
+          <div className="flex items-center gap-2 flex-wrap text-[10px] text-slate-400">
+            <span className="font-mono">{match.metadata.region as string ?? ''}</span>
+            <span>VPC: {match.metadata.vpcName as string ?? ''}</span>
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">{match.matchedValue}</div>
         </div>
       );
     }
@@ -614,8 +724,19 @@ const FlowNode: React.FC<FlowNodeProps> = ({ match, stage, isSelected, projects,
     }
     if (match.resourceType === 'ROUTE') {
       return (
-        <div className="mt-1">
+        <div className="mt-1 space-y-1">
           <span className="text-[10px] text-slate-400 font-mono">→ {match.metadata.nextHop as string ?? ''}</span>
+          <span className="text-[10px] text-slate-500">priority {String(match.metadata.priority ?? '')}</span>
+        </div>
+      );
+    }
+    if (match.resourceType === 'CLOUD_ARMOR') {
+      return (
+        <div className="mt-1 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] border rounded px-1.5 py-0.5 font-semibold bg-red-900/30 text-red-300 border-red-500/30">
+            {String(match.metadata.action ?? 'rule').toUpperCase()}
+          </span>
+          <span className="text-[10px] text-slate-500">priority {String(match.metadata.priority ?? '')}</span>
         </div>
       );
     }
@@ -755,13 +876,15 @@ const StageRow: React.FC<StageRowProps> = ({ stage, items, selectedNodeId, proje
 
 // ─── Selected LB Chain ────────────────────────────────────────────────────────
 
-const SelectedLbChainCard: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[] }> = ({ lb, projects }) => {
+const SelectedLbChainCard: React.FC<{ lb: GcpLoadBalancer; projectId: string; projects: GcpProject[] }> = ({ lb, projectId, projects }) => {
   const [expanded, setExpanded] = useState(false);
   const visibleBackends = expanded ? lb.backends : lb.backends.slice(0, LB_BACKEND_PREVIEW_LIMIT);
   const hasHiddenBackends = lb.backends.length > LB_BACKEND_PREVIEW_LIMIT;
   const hiddenBackendCount = lb.backends.length - visibleBackends.length;
   const policyNames = getLbPolicyNames(lb);
   const unavailablePolicyBackends = lb.backends.filter((backend) => lb.backendSecurityPolicyUnavailable?.[backend]).length;
+  const loadBalancerConsoleUrl = buildLoadBalancerConsoleUrl(projectId);
+  const cloudArmorConsoleUrl = buildCloudArmorConsoleUrl(projectId);
   const policyLookup = useMemo(() => {
     const lookup = new Map<string, GcpCloudArmorPolicy>();
     projects.forEach((project) => {
@@ -788,6 +911,7 @@ const SelectedLbChainCard: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[
               unavailable {unavailablePolicyBackends}
             </span>
           )}
+          <ConsoleExternalLink href={loadBalancerConsoleUrl} title="Open Load Balancer in GCP Console" text="Open" />
         </div>
       </div>
 
@@ -803,8 +927,9 @@ const SelectedLbChainCard: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[
           {visibleBackends.length > 0 ? (
             <div className="space-y-1.5">
               {visibleBackends.map((backend) => (
-                <div key={`chain-backend-${backend}`} className="text-[11px] font-mono text-slate-200 break-all">
-                  {backend}
+                <div key={`chain-backend-${backend}`} className="flex items-center gap-1.5 text-[11px] font-mono text-slate-200 break-all">
+                  <span>{backend}</span>
+                  <ConsoleExternalLink href={loadBalancerConsoleUrl} title="Open backend services in GCP Console" />
                 </div>
               ))}
               {hasHiddenBackends && (
@@ -837,6 +962,7 @@ const SelectedLbChainCard: React.FC<{ lb: GcpLoadBalancer; projects: GcpProject[
                       return (
                         <span key={`${backendName}-${policyName}`}>
                           <span className="font-mono">{policyName}</span>
+                          <ConsoleExternalLink href={cloudArmorConsoleUrl} title="Open Cloud Armor policies in GCP Console" className="inline-flex ml-1" />
                           {!policy && <span className="text-amber-300 ml-1">(Unavailable)</span>}
                           {idx < attachedPolicies.length - 1 ? ', ' : ''}
                         </span>
@@ -1046,6 +1172,9 @@ export const IpFlowVisualizer: React.FC<Props> = ({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs border rounded-full px-3 py-1 bg-sky-500/15 border-sky-500/40 text-sky-300">
+              READ ONLY
+            </span>
             <span className={`text-xs border rounded-full px-3 py-1 ${
               isScanning ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
               : hasWarning ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
@@ -1064,6 +1193,9 @@ export const IpFlowVisualizer: React.FC<Props> = ({
               {isRescanning ? 'Rescanning…' : 'Rescan'}
             </button>
           </div>
+        </div>
+        <div className="mt-4 text-xs text-sky-300 bg-sky-950/40 border border-sky-900 rounded-lg px-3 py-2">
+          This view is read-only. For any resource edits, use the external-link icons to continue in GCP Console.
         </div>
         {hasWarning && (
           <div className="mt-4 text-xs text-amber-300 bg-amber-900/20 border border-amber-800 rounded-lg px-3 py-2">
@@ -1143,7 +1275,7 @@ export const IpFlowVisualizer: React.FC<Props> = ({
             </div>
           ))}
           {selectedNode?.resolvedLb && (
-            <SelectedLbChainCard lb={selectedNode.resolvedLb} projects={projects} />
+            <SelectedLbChainCard lb={selectedNode.resolvedLb} projectId={selectedNode.match.projectId} projects={projects} />
           )}
           <div className="flex flex-col items-center pt-3">
             <div className="w-px h-4 bg-slate-700" />

@@ -43,6 +43,9 @@ describe('IpFlowVisualizer', () => {
       />
     );
 
+    expect(screen.getByText('READ ONLY')).toBeInTheDocument();
+    expect(screen.getByText(/This view is read-only/i)).toBeInTheDocument();
+
     fireEvent.change(screen.getByPlaceholderText(/Internal \(10.x.x.x\) or External IP/i), {
       target: { value: '35.1.1.1' },
     });
@@ -51,6 +54,9 @@ describe('IpFlowVisualizer', () => {
 
     const chainCard = screen.getByTestId('lb-flow-chain-card');
     const chainWithin = within(chainCard);
+    const hasConsoleLinks = screen
+      .getAllByRole('link')
+      .some((link) => (link as HTMLAnchorElement).href.includes('console.cloud.google.com'));
 
     expect(chainWithin.getByText('LB Flow Chain')).toBeInTheDocument();
     expect(chainWithin.getByText('1. Frontend')).toBeInTheDocument();
@@ -59,6 +65,7 @@ describe('IpFlowVisualizer', () => {
     expect(chainWithin.getByText('backends 4')).toBeInTheDocument();
     expect(chainWithin.getByText('policies 2')).toBeInTheDocument();
     expect(chainWithin.getByText('+1 more')).toBeInTheDocument();
+    expect(hasConsoleLinks).toBe(true);
     expect(screen.queryByText('allow-ssh')).not.toBeInTheDocument();
 
     fireEvent.click(chainWithin.getByText('+1 more'));

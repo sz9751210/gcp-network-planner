@@ -26,6 +26,8 @@ import { Operations } from './components/Operations';
 import { fetchInventory, fetchScan, startScan, type ScanRecord } from './services/api';
 import { GcpProject } from './types';
 
+const INITIAL_AUTO_SCAN_DONE_KEY = 'netPlanner.initialAutoScanDone';
+
 function App() {
   const [projects, setProjects] = useState<GcpProject[]>([]);
   const [loading, setLoading] = useState(false);
@@ -107,13 +109,53 @@ function App() {
     }
   };
 
+  const loadInventoryOnly = async (accountId: string) => {
+    setLoading(true);
+    setLoadingProgress('Loading latest inventory...');
+    setScanId('');
+    setScanErrors([]);
+
+    try {
+      const inventory = await fetchInventory(accountId);
+      setProjects(inventory);
+      setLastScannedAt(resolveLastScannedAt(inventory, ''));
+      setScanStatus(inventory.length > 0 ? 'success' : 'idle');
+      setLoadingProgress('');
+    } catch (error) {
+      console.error('Failed to load inventory:', error);
+      setProjects([]);
+      setScanStatus('failed');
+      setLoadingProgress('Failed to fetch inventory');
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      setLoadingProgress('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const hasCompletedInitialAutoScan = (): boolean => localStorage.getItem(INITIAL_AUTO_SCAN_DONE_KEY) === 'true';
+
+  const markInitialAutoScanCompleted = (): void => {
+    localStorage.setItem(INITIAL_AUTO_SCAN_DONE_KEY, 'true');
+  };
+
+  const loadDataForAccount = async (accountId: string) => {
+    if (!hasCompletedInitialAutoScan()) {
+      markInitialAutoScanCompleted();
+      await runScanAndLoadData(accountId);
+      return;
+    }
+
+    await loadInventoryOnly(accountId);
+  };
+
   useEffect(() => {
     const storedAccountId = localStorage.getItem('selectedServiceAccountId');
     if (!storedAccountId) {
       return;
     }
     setSelectedServiceAccountId(storedAccountId);
-    runScanAndLoadData(storedAccountId);
+    void loadDataForAccount(storedAccountId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -128,7 +170,7 @@ function App() {
     setSelectedServiceAccountId(accountId);
     setSelectedProjectId('all');
     localStorage.setItem('selectedServiceAccountId', accountId);
-    runScanAndLoadData(accountId);
+    void loadDataForAccount(accountId);
   };
 
   const handleRescanAllProjects = async (): Promise<void> => {

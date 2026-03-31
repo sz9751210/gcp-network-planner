@@ -162,6 +162,9 @@ export function buildIpUsageResult(
             subnetName: subnet.name,
             region: subnet.region,
             cidrPrefix: getCidrPrefix(subnet.ipCidrRange),
+            gatewayIp: subnet.gatewayIp,
+            privateGoogleAccess: subnet.privateGoogleAccess,
+            subnetSelfLink: subnet.selfLink,
           },
         });
       });
@@ -184,6 +187,9 @@ export function buildIpUsageResult(
             vpcName: vpc.name,
             priority: route.priority,
             nextHop: route.nextHop,
+            routeId: route.id,
+            routeDescription: route.description || '',
+            routeTags: summarizeList(route.tags || [], 4),
           },
         });
       });
@@ -205,6 +211,9 @@ export function buildIpUsageResult(
             subnetwork: instance.subnetwork,
             zone: instance.zone,
             ipKind: 'INTERNAL',
+            machineType: instance.machineType,
+            instanceStatus: instance.status,
+            networkTags: summarizeList(instance.tags || [], 5),
           },
         });
       }
@@ -224,6 +233,9 @@ export function buildIpUsageResult(
             subnetwork: instance.subnetwork,
             zone: instance.zone,
             ipKind: 'EXTERNAL',
+            machineType: instance.machineType,
+            instanceStatus: instance.status,
+            networkTags: summarizeList(instance.tags || [], 5),
           },
         });
       }
@@ -249,6 +261,12 @@ export function buildIpUsageResult(
           portRange: loadBalancer.portRange,
           region: loadBalancer.region,
           ipKind,
+          loadBalancerType: loadBalancer.type,
+          forwardingRuleName: loadBalancer.forwardingRuleName,
+          backendCount: loadBalancer.backends.length,
+          backendPreview: summarizeList(loadBalancer.backends || [], 4),
+          cloudArmorCount: getLoadBalancerAttachedPolicyNames(loadBalancer).length,
+          cloudArmorPolicies: summarizeList(getLoadBalancerAttachedPolicyNames(loadBalancer), 4),
         },
       });
 
@@ -296,6 +314,8 @@ export function buildIpUsageResult(
               direction: rule.direction,
               action: rule.action,
               priority: rule.priority,
+              disabled: rule.disabled,
+              targetTags: summarizeList(rule.targetTags || [], 4),
             },
           });
         });
@@ -329,6 +349,10 @@ export function buildIpUsageResult(
               policyName: policy.name,
               action: rule.action,
               priority: rule.priority,
+              policyType: policy.type,
+              policyRulesCount: policy.rulesCount,
+              preview: rule.preview,
+              ruleDescription: rule.description || '',
             },
           });
         });
@@ -497,4 +521,21 @@ function toNumber(value: string | number | boolean | undefined, fallback: number
     }
   }
   return fallback;
+}
+
+function summarizeList(values: string[], limit: number): string {
+  const nonEmptyValues = values
+    .map((value) => value.trim())
+    .filter((value) => value !== '');
+
+  if (nonEmptyValues.length === 0) {
+    return '';
+  }
+
+  if (nonEmptyValues.length <= limit) {
+    return nonEmptyValues.join(', ');
+  }
+
+  const visible = nonEmptyValues.slice(0, limit).join(', ');
+  return `${visible} +${nonEmptyValues.length - limit}`;
 }
